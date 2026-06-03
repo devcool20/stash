@@ -1,0 +1,6 @@
+{
+  "name": "Stash",
+  "description": "A local-first visual inbox utility featuring client-side OCR, automatic categorization, full-text search, and a premium dark glassmorphism layout.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
