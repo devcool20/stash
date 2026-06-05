@@ -117,8 +117,8 @@ app.get('/api/metadata', async (req, res) => {
   }
 });
 
-// 2. API Endpoint: On-Device Gemini OCR Engine
-// Leverages server-side Gemini 3.5-flash model to process uploaded raw screenshot base64 strings
+// 2. API Endpoint: On-Device Gemini OCR and Rich Context Engine
+// Leverages server-side Gemini 3.5-flash model to analyze uploaded screenshot base64 strings and extract structured metadata
 app.post('/api/ocr', async (req, res) => {
   const { base64, mimeType } = req.body;
   if (!base64) {
@@ -132,7 +132,7 @@ app.post('/api/ocr', async (req, res) => {
       const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
       
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: [
           {
             inlineData: {
@@ -141,31 +141,77 @@ app.post('/api/ocr', async (req, res) => {
             },
           },
           {
-            text: 'Perform comprehensive OCR of this screen, photograph, or interface. Extract all visible text strings, prices, descriptions, names, dates, addresses, recipes, quotes, and structural data. Output ONLY the raw extracted characters found. Ensure you preserve readable sentences and paragraphs. Do not write any greetings, comments, analysis, titles or notes; write only the direct text results.',
+            text: `Analyze this screenshot or image. Perform comprehensive OCR and image understanding.
+You must return a structured JSON object with the following fields:
+- "text": The complete raw extracted OCR text from the image, preserving sentences.
+- "title": A smart, premium, descriptive title of what the screenshot is of (e.g. "Green Midi Dress" or "Hakone Onsen Stay").
+- "description": A genuine, detailed, context-aware description explaining exactly what is pictured in the screenshot (not just related to it, but a description of it).
+- "category": One of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom recommended folder name (like "Fashion" or "Fitness") if it fits the visual content perfectly.
+- "tags": An array of 3-5 relevant semantic tags extracted from the image.
+
+Return ONLY the raw JSON object conforming to this schema.`,
           }
         ],
+        config: {
+          responseMimeType: 'application/json'
+        }
       });
 
-      const extractedText = response.text ? response.text.trim() : '';
-      return res.json({ text: extractedText });
+      const jsonText = response.text ? response.text.trim() : '{}';
+      const parsedData = JSON.parse(jsonText);
+      return res.json({
+        text: parsedData.text || '',
+        title: parsedData.title || 'Analyzed Screenshot',
+        description: parsedData.description || 'Extracted screenshot visual elements',
+        category: parsedData.category || 'Design',
+        tags: parsedData.tags || []
+      });
 
     } catch (err: any) {
       console.error('Gemini OCR runtime call failed:', err);
       return res.json({
-        text: 'FALLBACK SCRAP: [CRITICAL EXCEPTION] OCR pipeline encountered a timeout. Standard alphanumeric tokens: Stash collection core components loaded with high-fidelity active metrics.',
+        text: 'FALLBACK SCRAP: [CRITICAL EXCEPTION] OCR pipeline encountered a timeout.',
+        title: 'Timeout Fallback Node',
+        description: 'Pipeline encountered a timeout during processing.',
+        category: 'Design',
+        tags: ['fallback'],
         error: err.message
       });
     }
   } else {
-    // Elegant client simulated OCR content if server key is not entered
+    // Elegant client simulated structured response if server key is not entered
     const mockOCRResponses = [
-      'AUTHENTIC PREMIUM LOOKS FOR MEN & WOMEN\nDESIGNED IN BALENCIAGA PARIS STUDS\nPRICE: €1200.00\nSIZE: EXTRA LARGE\nPOSTED: 3 HOURS AGO\nTAGS: #FASHION #DESIGN',
-      'INGREDIENTS LIST:\n- 4 ORGANIC EGGS\n- 1 CUP UNSTABILIZED HOLLANDAISE\n- CHIVES & CURED DUCK THIGHS\n- WILD SOURDOUGH LOAF\nBON APPETIT MAG.',
-      'SOMA STRETCH ARMCHAIR OAKEN WOODS\nMATERIAL: BOUCHÉ TEXTURED\nDESIGNER ID: WEGNER-284\nRETAIL: $4,250',
-      'FLUID CYAN GRADIENTS STUDIES MAPPED\nSPLINE SHADER S3D - COMPOSITING\nREACTION RATIO: 16MS\nCREATED AT DEV-STASH LABS'
+      {
+        text: 'AUTHENTIC PREMIUM LOOKS FOR MEN & WOMEN\nDESIGNED IN BALENCIAGA PARIS STUDS\nPRICE: €1200.00\nSIZE: EXTRA LARGE\nPOSTED: 3 HOURS AGO\nTAGS: #FASHION #DESIGN',
+        title: 'Balenciaga Studio Preview',
+        description: 'Product listing page showing Balenciaga Paris studs for men and women.',
+        category: 'Shopping',
+        tags: ['fashion', 'balenciaga', 'design']
+      },
+      {
+        text: 'INGREDIENTS LIST:\n- 4 ORGANIC EGGS\n- 1 CUP UNSTABILIZED HOLLANDAISE\n- CHIVES & CURED DUCK THIGHS\n- WILD SOURDOUGH LOAF\nBON APPETIT MAG.',
+        title: 'Sunday Brunch Benedict Recipe',
+        description: 'Ingredients card for a slow Sunday brunch showing eggs benedict on sourdough.',
+        category: 'Recipes',
+        tags: ['brunch', 'recipe', 'cooking']
+      },
+      {
+        text: 'SOMA STRETCH ARMCHAIR OAKEN WOODS\nMATERIAL: BOUCHÉ TEXTURED\nDESIGNER ID: WEGNER-284\nRETAIL: $4,250',
+        title: 'Soma Oak Chair Specs',
+        description: 'Spec sheet for a Soma oaken stretch armchair with bouché fabric.',
+        category: 'Design',
+        tags: ['furniture', 'interior', 'designer']
+      },
+      {
+        text: 'FLUID CYAN GRADIENTS STUDIES MAPPED\nSPLINE SHADER S3D - COMPOSITING\nREACTION RATIO: 16MS\nCREATED AT DEV-STASH LABS',
+        title: 'Cyan Fluid Spline compositing',
+        description: 'Gradients visual study render with Spline 3D compositing shaders.',
+        category: 'Design',
+        tags: ['compositing', 'spline', 'shader']
+      }
     ];
     const randomIndex = Math.floor(Math.random() * mockOCRResponses.length);
-    return res.json({ text: mockOCRResponses[randomIndex] });
+    return res.json(mockOCRResponses[randomIndex]);
   }
 });
 

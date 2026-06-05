@@ -246,7 +246,11 @@ async function runTestSuite() {
       const data = await res.json();
       assert.ok('text' in data, 'OCR response should have a text property');
       assert.strictEqual(typeof data.text, 'string', 'OCR text property should be a string');
-      console.log(`   OCR Result Text snippet: [${data.text.trim().substring(0, 100)}]`);
+      assert.ok('title' in data, 'OCR response should have a title property');
+      assert.ok('description' in data, 'OCR response should have a description property');
+      assert.ok('category' in data, 'OCR response should have a category property');
+      assert.ok('tags' in data, 'OCR response should have a tags property');
+      console.log(`   OCR Result Title: [${data.title}], Category: [${data.category}]`);
     });
 
     // --------------------------------------------------

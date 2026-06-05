@@ -259,8 +259,11 @@ export const DEFAULT_ITEMS: StashItem[] = [
   },
 ];
 
+const CATEGORIES_KEY = 'stash_categories_v1';
+
 class StashDatabase {
   private items: StashItem[] = [];
+  private categories: string[] = [];
   private ready: Promise<void>;
 
   constructor() {
@@ -276,8 +279,17 @@ class StashDatabase {
         this.items = [...DEFAULT_ITEMS];
         await this.save();
       }
+
+      const storedCats = await AsyncStorage.getItem(CATEGORIES_KEY);
+      if (storedCats) {
+        this.categories = JSON.parse(storedCats);
+      } else {
+        this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+        await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
+      }
     } catch (e) {
       this.items = [...DEFAULT_ITEMS];
+      this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
     }
   }
 
@@ -287,6 +299,32 @@ class StashDatabase {
     } catch (e) {
       // swallow
     }
+  }
+
+  public async getCategories(): Promise<string[]> {
+    await this.ready;
+    return [...this.categories];
+  }
+
+  public async addCategory(category: string): Promise<string[]> {
+    await this.ready;
+    const clean = category.trim();
+    if (!clean) return this.categories;
+    const exists = this.categories.some(
+      (c) => c.toLowerCase() === clean.toLowerCase()
+    );
+    if (!exists) {
+      const formatted = clean.charAt(0).toUpperCase() + clean.slice(1);
+      this.categories.push(formatted);
+      await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
+    }
+    return this.categories;
+  }
+
+  public async resetCategories(): Promise<void> {
+    await this.ready;
+    this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+    await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
   }
 
   public async getAll(): Promise<StashItem[]> {
@@ -355,15 +393,13 @@ class StashDatabase {
     return this.items.length < initialLen;
   }
 
-  public async getCounts(): Promise<Record<CategoryKey, number>> {
+  public async getCounts(): Promise<Record<string, number>> {
     const all = await this.getAll();
-    const counts: Record<CategoryKey, number> = {
-      Shopping: 0,
-      Recipes: 0,
-      Travel: 0,
-      Articles: 0,
-      Design: 0,
-    };
+    const categories = await this.getCategories();
+    const counts: Record<string, number> = {};
+    categories.forEach((cat) => {
+      counts[cat] = 0;
+    });
     all.forEach((item) => {
       if (item.status === 'ready') {
         counts[item.category] = (counts[item.category] || 0) + 1;
@@ -396,6 +432,7 @@ class StashDatabase {
   public async reset(): Promise<void> {
     this.items = [...DEFAULT_ITEMS];
     await this.save();
+    await this.resetCategories();
   }
 }
 

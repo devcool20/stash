@@ -190,6 +190,7 @@ export function AddStashModal({
       let finalSource = tempItem.sourceUrl || '';
       let finalFavicon = '';
       let finalOcr = '';
+      let derived = tempItem.category;
 
       if (type === 'link') {
         setPipelineProgress(
@@ -227,6 +228,7 @@ export function AddStashModal({
           'ON-DEVICE OCR PIPELINE (1200ms)... engaging local neural core',
         );
         let ocrText = '';
+        let ocrData: any = null;
         try {
           let base64Data = source.imageBase64;
           if (!base64Data && source.imageUrl) {
@@ -256,7 +258,7 @@ export function AddStashModal({
             clearTimeout(timeoutId);
 
             if (res.ok) {
-              const ocrData = await res.json();
+              ocrData = await res.json();
               ocrText = ocrData.text || '';
             } else {
               throw new Error('OCR API returned error status.');
@@ -269,14 +271,50 @@ export function AddStashModal({
           await new Promise((r) => setTimeout(r, 600));
           const idx = Math.floor(Math.random() * MOCK_OCR.length);
           ocrText = MOCK_OCR[idx];
+          
+          const mockOCRResponses = [
+            {
+              text: 'AUTHENTIC PREMIUM LOOKS FOR MEN & WOMEN\nDESIGNED IN BALENCIAGA PARIS STUDS\nPRICE: €1200.00\nSIZE: EXTRA LARGE\nPOSTED: 3 HOURS AGO\nTAGS: #FASHION #DESIGN',
+              title: 'Balenciaga Studio Preview',
+              description: 'Product listing page showing Balenciaga Paris studs for men and women.',
+              category: 'Shopping',
+              tags: ['fashion', 'balenciaga', 'design']
+            },
+            {
+              text: 'INGREDIENTS LIST:\n- 4 ORGANIC EGGS\n- 1 CUP UNSTABILIZED HOLLANDAISE\n- CHIVES & CURED DUCK THIGHS\n- WILD SOURDOUGH LOAF\nBON APPETIT MAG.',
+              title: 'Sunday Brunch Benedict Recipe',
+              description: 'Ingredients card for a slow Sunday brunch showing eggs benedict on sourdough.',
+              category: 'Recipes',
+              tags: ['brunch', 'recipe', 'cooking']
+            },
+            {
+              text: 'SOMA STRETCH ARMCHAIR OAKEN WOODS\nMATERIAL: BOUCHÉ TEXTURED\nDESIGNER ID: WEGNER-284\nRETAIL: $4,250',
+              title: 'Soma Oak Chair Specs',
+              description: 'Spec sheet for a Soma oaken stretch armchair with bouché fabric.',
+              category: 'Design',
+              tags: ['furniture', 'interior', 'designer']
+            },
+            {
+              text: 'FLUID CYAN GRADIENTS STUDIES MAPPED\nSPLINE SHADER S3D - COMPOSITING\nREACTION RATIO: 16MS\nCREATED AT DEV-STASH LABS',
+              title: 'Cyan Fluid Spline compositing',
+              description: 'Gradients visual study render with Spline 3D compositing shaders.',
+              category: 'Design',
+              tags: ['compositing', 'spline', 'shader']
+            }
+          ];
+          ocrData = mockOCRResponses.find(m => m.text === ocrText) || {
+            text: ocrText,
+            title: source.title || 'Extracted Screenshot',
+            description: ocrText.substring(0, 100) + '...',
+            category: 'Design',
+            tags: ['fallback']
+          };
         }
 
         finalOcr = ocrText;
-        finalTitle = source.title || 'Extracted Screenshot';
-        finalDesc =
-          finalOcr.length > 100
-            ? finalOcr.substring(0, 100) + '...'
-            : 'Extracted screenshot visual elements';
+        finalTitle = ocrData?.title || source.title || 'Extracted Screenshot';
+        finalDesc = ocrData?.description || 'Extracted screenshot visual elements';
+        derived = ocrData?.category || 'Design';
         finalImg = source.imageUri || source.imageUrl || '';
       }
 
@@ -286,49 +324,53 @@ export function AddStashModal({
         'FTS5 TOKEN INDEXING (220ms)... tokenizing keywords, status="ready" on-device sync completed',
       );
 
-      const combined = `${finalTitle} ${finalDesc} ${finalOcr}`.toLowerCase();
-      const autoCategory = autoCategorize(
-        finalOcr || finalDesc || '',
-        finalTitle,
-        finalSource,
-      );
+      if (type === 'link') {
+        const combined = `${finalTitle} ${finalDesc} ${finalOcr}`.toLowerCase();
+        const autoCategory = autoCategorize(
+          finalOcr || finalDesc || '',
+          finalTitle,
+          finalSource,
+        );
 
-      // Re-derive the best category using the same combined heuristic
-      let derived = autoCategory;
-      if (
-        combined.includes('poached') ||
-        combined.includes('egg') ||
-        combined.includes('brunch') ||
-        combined.includes('recipe') ||
-        combined.includes('food')
-      )
-        derived = 'Recipes';
-      else if (
-        combined.includes('mount') ||
-        combined.includes('valley') ||
-        combined.includes('travel') ||
-        combined.includes('trip') ||
-        combined.includes('hiking')
-      )
-        derived = 'Travel';
-      else if (
-        combined.includes('cotton') ||
-        combined.includes('shirting') ||
-        combined.includes('wear') ||
-        combined.includes('price') ||
-        combined.includes('buy') ||
-        combined.includes('watch') ||
-        combined.includes('luxur')
-      )
-        derived = 'Shopping';
-      else if (
-        combined.includes('theory') ||
-        combined.includes('sovereignty') ||
-        combined.includes('read') ||
-        combined.includes('article')
-      )
-        derived = 'Articles';
-      else if (type === 'image') derived = 'Design';
+        // Re-derive the best category using the same combined heuristic
+        derived = autoCategory;
+        if (
+          combined.includes('poached') ||
+          combined.includes('egg') ||
+          combined.includes('brunch') ||
+          combined.includes('recipe') ||
+          combined.includes('food')
+        )
+          derived = 'Recipes';
+        else if (
+          combined.includes('mount') ||
+          combined.includes('valley') ||
+          combined.includes('travel') ||
+          combined.includes('trip') ||
+          combined.includes('hiking')
+        )
+          derived = 'Travel';
+        else if (
+          combined.includes('cotton') ||
+          combined.includes('shirting') ||
+          combined.includes('wear') ||
+          combined.includes('price') ||
+          combined.includes('buy') ||
+          combined.includes('watch') ||
+          combined.includes('luxur')
+        )
+          derived = 'Shopping';
+        else if (
+          combined.includes('theory') ||
+          combined.includes('sovereignty') ||
+          combined.includes('read') ||
+          combined.includes('article')
+        )
+          derived = 'Articles';
+      }
+
+      // Ensure the category exists in database categories list
+      await db.addCategory(derived);
 
       const readyItem = await db.update(tempItem.id, {
         title: finalTitle,

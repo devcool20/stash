@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   ScrollView,
+  NativeModules,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -53,6 +54,63 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
   const [zeroLeak, setZeroLeak] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [bubbleActive, setBubbleActive] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const { FloatBubbleModule } = NativeModules;
+      if (FloatBubbleModule) {
+        FloatBubbleModule.isBubbleServiceRunning().then(setBubbleActive);
+      }
+    }
+  }, []);
+
+  const handleToggleBubble = async (value: boolean) => {
+    if (Platform.OS !== 'android') {
+      Alert.alert('Platform not supported', 'Floating overlay bubble is only supported on Android.');
+      return;
+    }
+
+    const { FloatBubbleModule } = NativeModules;
+    if (!FloatBubbleModule) {
+      Alert.alert('Module Error', 'FloatBubbleModule not found.');
+      return;
+    }
+
+    if (value) {
+      try {
+        const hasOverlay = await FloatBubbleModule.hasOverlayPermission();
+        if (!hasOverlay) {
+          Alert.alert(
+            'Overlay Permission Required',
+            'Please grant "Draw over other apps" permission in system settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Grant',
+                onPress: async () => {
+                  await FloatBubbleModule.requestOverlayPermission();
+                },
+              },
+            ]
+          );
+          return;
+        }
+
+        const success = await FloatBubbleModule.startBubbleService();
+        if (success) {
+          setBubbleActive(true);
+        } else {
+          Alert.alert('Permission Rejected', 'Screen capture permission is required to take screenshots.');
+        }
+      } catch (err: any) {
+        Alert.alert('Error starting overlay', err.message || err);
+      }
+    } else {
+      await FloatBubbleModule.stopBubbleService();
+      setBubbleActive(false);
+    }
+  };
 
   const handleCopy = async () => {
     try {
@@ -204,6 +262,17 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
             value={zeroLeak}
             onChange={setZeroLeak}
           />
+          {Platform.OS === 'android' && (
+            <>
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Floating Overlay Capture"
+                desc="Displays a persistent hover bubble to instantly capture and stash screen contents in other apps (Instagram, Twitter, Pinterest, WhatsApp)."
+                value={bubbleActive}
+                onChange={handleToggleBubble}
+              />
+            </>
+          )}
         </GlassPanel>
       </View>
 

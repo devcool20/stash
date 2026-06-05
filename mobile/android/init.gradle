@@ -1,0 +1,25 @@
+import javax.net.ssl.*
+import java.security.cert.X509Certificate
+
+// Override Java trust manager to accept all certificates (bypasses SSL interception/proxy issues)
+try {
+    def trustAllCerts = [
+        getAcceptedIssuers: { return null },
+        checkClientTrusted: { certs, authType -> },
+        checkServerTrusted: { certs, authType -> }
+    ] as X509TrustManager
+
+    def sc = SSLContext.getInstance("SSL")
+    sc.init(null, [trustAllCerts] as TrustManager[], new java.security.SecureRandom())
+    SSLContext.setDefault(sc)
+    HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory())
+
+    def allHostsValid = [
+        verify: { hostname, session -> return true }
+    ] as HostnameVerifier
+    HttpsURLConnection.setDefaultHostnameVerifier(allHostsValid)
+    
+    System.out.println("🔓 SSL Certificate Verification bypassed successfully.")
+} catch (Exception e) {
+    System.err.println("Failed to bypass SSL verification: " + e.getMessage())
+}

@@ -5,8 +5,10 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  TextInput,
+  Pressable,
 } from 'react-native';
-import { Sparkles } from 'lucide-react-native';
+import { Sparkles, Plus } from 'lucide-react-native';
 import { db } from '../database';
 import { StashItem, ActiveCategory, CategoryKey } from '../types';
 import { CategoriesTab } from '../components/CategoriesTab';
@@ -27,6 +29,15 @@ export function CategoriesScreen({
   const [selectedCategory, setSelectedCategory] =
     useState<ActiveCategory>('All');
   const [filtered, setFiltered] = useState<StashItem[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    await db.addCategory(name);
+    setNewCategoryName('');
+    setSelectedCategory(name);
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -56,6 +67,26 @@ export function CategoriesScreen({
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
       />
+
+      <View style={styles.addCategoryContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Create custom folder..."
+          placeholderTextColor="#6E6E76"
+          value={newCategoryName}
+          onChangeText={setNewCategoryName}
+          autoCapitalize="words"
+        />
+        <Pressable
+          style={({ pressed }) => [
+            styles.addButton,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={handleAddCategory}
+        >
+          <Plus color="#000000" size={16} strokeWidth={2.5} />
+        </Pressable>
+      </View>
 
       {/* web: px-1 flex items-center justify-between text-[9px] font-display text-gray-500 uppercase tracking-widest */}
       <View style={styles.groupHeader}>
@@ -97,6 +128,33 @@ export function CategoriesScreen({
 const styles = StyleSheet.create({
   scroll: {
     paddingTop: 4,
+  },
+  addCategoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  input: {
+    flex: 1,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#22D3EE',
+    borderRadius: 12,
+    marginLeft: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   // web: px-1 flex items-center justify-between text-[9px] font-display text-gray-500 uppercase tracking-widest
   groupHeader: {

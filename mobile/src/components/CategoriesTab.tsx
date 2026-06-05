@@ -13,8 +13,9 @@ import {
   Compass,
   BookOpen,
   Layers,
+  Folder,
 } from 'lucide-react-native';
-import { ActiveCategory, CategoryKey } from '../types';
+import { ActiveCategory } from '../types';
 import { db } from '../database';
 import { colors } from '../theme/colors';
 
@@ -23,117 +24,117 @@ interface CategoriesTabProps {
   onSelectCategory: (cat: ActiveCategory) => void;
 }
 
-const CATEGORIES: {
-  id: ActiveCategory;
-  label: string;
-  icon: any;
-  glow: string;
-  color: string;
-  bg: string;
-}[] = [
-  {
-    id: 'All',
-    label: 'All STASH',
-    icon: Layers,
-    glow: 'rgba(255, 255, 255, 0.1)',
-    color: '#FFFFFF',
-    bg: '#FFFFFF',
-  },
-  {
-    id: 'Shopping',
-    label: 'Shopping',
-    icon: ShoppingBag,
-    glow: 'rgba(244, 63, 94, 0.25)',
-    color: '#FB7185', // rose-400
-    bg: '#F43F5E',
-  },
-  {
-    id: 'Recipes',
-    label: 'Recipes',
-    icon: Utensils,
-    glow: 'rgba(245, 158, 11, 0.25)',
-    color: '#FBBF24', // amber-400
-    bg: '#F59E0B',
-  },
-  {
-    id: 'Travel',
-    label: 'Travel',
-    icon: Compass,
-    glow: 'rgba(16, 185, 129, 0.25)',
-    color: '#34D399', // emerald-400
-    bg: '#10B981',
-  },
-  {
-    id: 'Articles',
-    label: 'Articles',
-    icon: BookOpen,
-    glow: 'rgba(139, 92, 246, 0.25)',
-    color: '#A78BFA', // violet-400
-    bg: '#8B5CF6',
-  },
-  {
-    id: 'Design',
-    label: 'Design',
-    icon: Layers,
-    glow: 'rgba(217, 70, 239, 0.25)',
-    color: '#E879F9', // fuchsia-400
-    bg: '#D946EF',
-  },
-];
+const getCategoryMeta = (catId: string) => {
+  const PRESETS: Record<
+    string,
+    { label: string; icon: any; glow: string; color: string; bg: string }
+  > = {
+    All: {
+      label: 'All STASH',
+      icon: Layers,
+      glow: 'rgba(255, 255, 255, 0.1)',
+      color: '#FFFFFF',
+      bg: '#FFFFFF',
+    },
+    Shopping: {
+      label: 'Shopping',
+      icon: ShoppingBag,
+      glow: 'rgba(244, 63, 94, 0.25)',
+      color: '#FB7185',
+      bg: '#F43F5E',
+    },
+    Recipes: {
+      label: 'Recipes',
+      icon: Utensils,
+      glow: 'rgba(245, 158, 11, 0.25)',
+      color: '#FBBF24',
+      bg: '#F59E0B',
+    },
+    Travel: {
+      label: 'Travel',
+      icon: Compass,
+      glow: 'rgba(16, 185, 129, 0.25)',
+      color: '#34D399',
+      bg: '#10B981',
+    },
+    Articles: {
+      label: 'Articles',
+      icon: BookOpen,
+      glow: 'rgba(139, 92, 246, 0.25)',
+      color: '#A78BFA',
+      bg: '#8B5CF6',
+    },
+    Design: {
+      label: 'Design',
+      icon: Layers,
+      glow: 'rgba(217, 70, 239, 0.25)',
+      color: '#E879F9',
+      bg: '#D946EF',
+    },
+  };
+
+  return (
+    PRESETS[catId] || {
+      label: catId,
+      icon: Folder,
+      glow: 'rgba(6, 182, 212, 0.25)',
+      color: '#22D3EE',
+      bg: '#06B6D4',
+    }
+  );
+};
 
 export function CategoriesTab({
   selectedCategory,
   onSelectCategory,
 }: CategoriesTabProps) {
-  const [counts, setCounts] = useState<Record<CategoryKey, number>>({
-    Shopping: 0,
-    Recipes: 0,
-    Travel: 0,
-    Articles: 0,
-    Design: 0,
-  });
+  const [categories, setCategories] = useState<string[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    db.getCounts().then(setCounts);
-  }, []);
+    const loadData = async () => {
+      const cats = await db.getCategories();
+      const cnts = await db.getCounts();
+      setCategories(['All', ...cats]);
+      setCounts(cnts);
+    };
+    loadData();
+  }, [selectedCategory]);
 
   return (
-    // web: space-y-4 py-1
     <View style={styles.container}>
-      {/* web: flex items-center justify-between px-1 */}
       <View style={styles.headerRow}>
-        {/* web: text-[10px] uppercase font-display tracking-widest text-[#8A8A93] */}
         <Text style={styles.headerLabel}>SMART LIBRARY LENSES</Text>
-        {/* web: font-mono text-[9px] text-[#8A8A93] */}
-        <Text style={styles.headerSub}>5 AUTO-CLUSTERING CORES</Text>
+        <Text style={styles.headerSub}>
+          {categories.length - 1} AUTO-CLUSTERING CORES
+        </Text>
       </View>
 
-      {/* web: flex space-x-3 overflow-x-auto pb-4 pt-1 px-1 */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        snapToInterval={TILE_SIZE + 12} // tile + gap
+        snapToInterval={TILE_SIZE + 12}
         decelerationRate="fast"
       >
-        {CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          const isSelected = selectedCategory === cat.id;
+        {categories.map((catId) => {
+          const meta = getCategoryMeta(catId);
+          const Icon = meta.icon;
+          const isSelected = selectedCategory === catId;
           const count =
-            cat.id === 'All'
+            catId === 'All'
               ? Object.values(counts).reduce((a, b) => a + b, 0)
-              : counts[cat.id as CategoryKey] || 0;
+              : counts[catId] || 0;
 
           return (
             <Pressable
-              key={cat.id}
-              onPress={() => onSelectCategory(cat.id)}
+              key={catId}
+              onPress={() => onSelectCategory(catId)}
               style={({ pressed }) => [
-                { marginRight: 12 }, // space-x-3 = 12px
+                { marginRight: 12 },
                 pressed && { transform: [{ scale: 0.98 }] },
               ]}
             >
-              {/* web: w-[110px] h-[110px] flex-col justify-between p-3.5 rounded-2xl border */}
               <View
                 style={[
                   styles.tile,
@@ -141,7 +142,7 @@ export function CategoriesTab({
                     backgroundColor: 'rgba(255,255,255,0.08)',
                     borderColor: 'rgba(255,255,255,0.25)',
                     transform: [{ scale: 1.03 }],
-                    shadowColor: cat.glow,
+                    shadowColor: meta.glow,
                     shadowOpacity: 1,
                     shadowRadius: 25,
                     shadowOffset: { width: 0, height: 0 },
@@ -151,30 +152,24 @@ export function CategoriesTab({
                   },
                 ]}
               >
-                {/* Top row: icon + selection dot */}
                 <View style={styles.tileTop}>
-                  {/* web: p-1.5 rounded-xl bg-white/5 border border-white/10 */}
                   <View style={styles.iconBox}>
-                    <Icon color={cat.color} size={16} strokeWidth={2} />
+                    <Icon color={meta.color} size={16} strokeWidth={2} />
                   </View>
                   {isSelected && (
-                    // web: w-2 h-2 rounded-full shadow
                     <View
                       style={[
                         styles.selDot,
-                        { backgroundColor: cat.bg },
+                        { backgroundColor: meta.bg },
                       ]}
                     />
                   )}
                 </View>
 
-                {/* Bottom: label + count */}
                 <View>
-                  {/* web: font-display font-medium text-xs tracking-tight text-white mb-0.5 */}
                   <Text style={styles.tileLabel} numberOfLines={1}>
-                    {cat.id === 'All' ? 'Vault (All)' : cat.id}
+                    {catId === 'All' ? 'Vault (All)' : meta.label}
                   </Text>
-                  {/* web: font-mono text-[8px] text-gray-500 uppercase tracking-wider */}
                   <Text style={styles.tileCount}>
                     {count} {count === 1 ? 'ASSET' : 'ASSETS'}
                   </Text>

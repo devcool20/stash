@@ -3,6 +3,7 @@ import {
   View,
   StyleSheet,
   StatusBar,
+  AppRegistry,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -10,6 +11,8 @@ import Animated, {
   FadeOut,
 } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+AppRegistry.registerHeadlessTask('ScreenshotIngestionTask', () => require('./src/tasks/screenshotTask').default);
 
 import { db } from './src/database';
 import { StashItem, TabKey, CategoryKey } from './src/types';
