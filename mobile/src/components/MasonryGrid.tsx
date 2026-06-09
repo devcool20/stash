@@ -13,7 +13,9 @@ import Animated, {
   withRepeat,
   withTiming,
   withSequence,
+  withSpring,
   Easing,
+  FadeIn,
 } from 'react-native-reanimated';
 import {
   ShoppingBag,
@@ -74,10 +76,11 @@ export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
       <View style={styles.col}>
         {items
           .filter((_, i) => i % 2 === 0)
-          .map((item) => (
+          .map((item, filterIndex) => (
             <GridCard
               key={item.id}
               item={item}
+              index={filterIndex}
               onItemClick={onItemClick}
             />
           ))}
@@ -85,10 +88,11 @@ export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
       <View style={[styles.col, { paddingTop: 18 }]}>
         {items
           .filter((_, i) => i % 2 !== 0)
-          .map((item) => (
+          .map((item, filterIndex) => (
             <GridCard
               key={item.id}
               item={item}
+              index={filterIndex}
               onItemClick={onItemClick}
             />
           ))}
@@ -99,11 +103,19 @@ export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
 
 function GridCard({
   item,
+  index,
   onItemClick,
 }: {
   item: StashItem;
+  index: number;
   onItemClick: (item: StashItem) => void;
 }) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   if (item.status === 'processing') {
     return <ShimmerCard id={item.id} />;
   }
@@ -112,54 +124,63 @@ function GridCard({
     CATEGORY_COLOR[item.category] || colors.accentBrown;
 
   return (
-    <Pressable
-      onPress={() => onItemClick(item)}
-      style={({ pressed }) => [
-        { marginBottom: 12 },
-        pressed && { transform: [{ scale: 0.98 }] },
-      ]}
+    <Animated.View
+      entering={FadeIn.delay(index * 60).duration(350)}
+      style={{ marginBottom: 12 }}
     >
-      <View style={styles.card}>
-        {item.imageUrl ? (
-          <View style={styles.imgWrap}>
-            <ExpoImage
-              source={{ uri: item.imageUrl }}
-              style={styles.img}
-              contentFit="cover"
-              transition={250}
-            />
-            <View style={styles.imgOverlay} />
-          </View>
-        ) : null}
+      <Pressable
+        onPress={() => onItemClick(item)}
+        onPressIn={() => {
+          scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 12, stiffness: 200 });
+        }}
+      >
+        <Animated.View style={animatedStyle}>
+          <View style={styles.card}>
+            {item.imageUrl ? (
+              <View style={styles.imgWrap}>
+                <ExpoImage
+                  source={{ uri: item.imageUrl }}
+                  style={styles.img}
+                  contentFit="cover"
+                  transition={250}
+                />
+                <View style={styles.imgOverlay} />
+              </View>
+            ) : null}
 
-        <View
-          style={[
-            styles.catPill,
-            { backgroundColor: catColor },
-          ]}
-        >
-          {getCategoryIcon(item.category)}
-        </View>
+            <View
+              style={[
+                styles.catPill,
+                { backgroundColor: catColor },
+              ]}
+            >
+              {getCategoryIcon(item.category)}
+            </View>
 
-        {item.sourceUrl ? (
-          <View style={styles.faviconPill}>
-            <Image
-              source={{
-                uri:
-                  item.favicon ||
-                  `https://www.google.com/s2/favicons?sz=64&domain=${
-                    item.sourceUrl
-                      .replace(/^https?:\/\//i, '')
-                      .split('/')[0]
-                  }`,
-              }}
-              style={styles.faviconImg}
-              resizeMode="contain"
-            />
+            {item.sourceUrl ? (
+              <View style={styles.faviconPill}>
+                <Image
+                  source={{
+                    uri:
+                      item.favicon ||
+                      `https://www.google.com/s2/favicons?sz=64&domain=${
+                        item.sourceUrl
+                          .replace(/^https?:\/\//i, '')
+                          .split('/')[0]
+                      }`,
+                  }}
+                  style={styles.faviconImg}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : null}
           </View>
-        ) : null}
-      </View>
-    </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
   );
 }
 

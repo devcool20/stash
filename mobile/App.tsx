@@ -124,7 +124,7 @@ export default function App() {
 
           <SafeAreaView edges={['top']} style={styles.body}>
             <View style={styles.headerArea}>
-              <AppHeader onIngestPress={() => setIsAddOpen(true)} />
+              <AppHeader />
               {showSearch && (
                 <SearchInterceptor
                   value={searchQuery}

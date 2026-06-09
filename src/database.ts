@@ -149,6 +149,13 @@ export const DEFAULT_ITEMS: StashItem[] = [
   }
 ];
 
+function resolveUrl(path: string): string {
+  if (typeof window !== 'undefined' && window.location) {
+    return path;
+  }
+  return `http://localhost:3000${path}`;
+}
+
 class StashDatabase {
   private items: StashItem[] = [];
   private categories: string[] = [];
@@ -224,7 +231,7 @@ class StashDatabase {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3500); // 3.5s sync timeout
-      const res = await fetch('/api/items', { signal: controller.signal });
+      const res = await fetch(resolveUrl('/api/items'), { signal: controller.signal });
       clearTimeout(timeout);
       
       if (res.ok) {
@@ -246,7 +253,7 @@ class StashDatabase {
           // 3. Delete any items on server that have local tombstones
           for (const id of deletedIds) {
             if (serverIds.has(id)) {
-              fetch(`/api/items/${id}`, { method: 'DELETE' })
+              fetch(resolveUrl(`/api/items/${id}`), { method: 'DELETE' })
                 .catch(err => console.warn('[Database] Failed to delete item on server:', err));
             }
           }
@@ -260,7 +267,7 @@ class StashDatabase {
 
           // 5. Upload local-only items back to server
           for (const item of localOnlyItems) {
-            fetch('/api/items', {
+            fetch(resolveUrl('/api/items'), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(item)
@@ -314,7 +321,7 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    fetch('/api/items', {
+    fetch(resolveUrl('/api/items'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newItem)
@@ -338,7 +345,7 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    fetch(`/api/items/${id}`, {
+    fetch(resolveUrl(`/api/items/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(this.items[index])
@@ -364,7 +371,7 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    fetch(`/api/items/${id}`, {
+    fetch(resolveUrl(`/api/items/${id}`), {
       method: 'DELETE'
     }).catch(err => console.warn('[Database] Background sync failed for delete:', err));
 
@@ -405,7 +412,7 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    fetch('/api/items/reset', {
+    fetch(resolveUrl('/api/items/reset'), {
       method: 'POST'
     }).catch(err => console.warn('[Database] Background sync failed for reset:', err));
   }

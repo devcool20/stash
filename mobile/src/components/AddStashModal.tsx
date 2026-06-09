@@ -174,16 +174,22 @@ export function AddStashModal({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(200)}
+          style={StyleSheet.absoluteFill}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.springify().damping(22).stiffness(220)}
-          exiting={SlideOutDown.duration(180)}
+          entering={SlideInDown.springify().damping(28).stiffness(180).mass(0.8)}
+          exiting={SlideOutDown.springify().damping(28).stiffness(240)}
           style={styles.sheet}
         >
           <View style={styles.sheetPanel}>
@@ -208,7 +214,11 @@ export function AddStashModal({
             <View style={styles.modeRow}>
               <Pressable
                 onPress={() => setMode('url')}
-                style={[styles.modeTab, mode === 'url' && styles.modeTabActive]}
+                style={({ pressed }) => [
+                  styles.modeTab,
+                  mode === 'url' && styles.modeTabActive,
+                  pressed && { transform: [{ scale: 0.95 }] },
+                ]}
               >
                 <Link2
                   color={mode === 'url' ? colors.bg : colors.textSecondary}
@@ -221,7 +231,11 @@ export function AddStashModal({
               </Pressable>
               <Pressable
                 onPress={() => setMode('image')}
-                style={[styles.modeTab, mode === 'image' && styles.modeTabActive]}
+                style={({ pressed }) => [
+                  styles.modeTab,
+                  mode === 'image' && styles.modeTabActive,
+                  pressed && { transform: [{ scale: 0.95 }] },
+                ]}
               >
                 <ImageIcon
                   color={mode === 'image' ? colors.bg : colors.textSecondary}
@@ -272,7 +286,7 @@ export function AddStashModal({
                       onPress={handleLinkSubmit}
                       style={({ pressed }) => [
                         styles.submitBtn,
-                        pressed && { opacity: 0.85 },
+                        pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
                       ]}
                     >
                       <Search color={colors.bg} size={14} strokeWidth={2.4} />
@@ -321,7 +335,7 @@ export function AddStashModal({
                       onPress={handleImageSubmit}
                       style={({ pressed }) => [
                         styles.primaryBtn,
-                        pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                        pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
                       ]}
                     >
                       <Text style={styles.primaryBtnText}>Process image</Text>

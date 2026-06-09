@@ -26,7 +26,7 @@ const SERVER_URL = 'http://localhost:3000';
 // A tiny 1x1 transparent PNG base64 representation with some visual text context if needed
 // This acts as a standard small image to send to the OCR endpoint
 const TEST_IMAGE_BASE64 =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVQIW2P8z8AARAwMjDAGACwBA/+8RVWvAAAAAElFTkSuQmCC';
 
 // Connects to the port as a client to verify if the server is listening, avoiding socket binding conflicts.
 async function isPortActive(port: number): Promise<boolean> {

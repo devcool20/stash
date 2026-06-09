@@ -4,6 +4,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  interpolateColor,
 } from 'react-native-reanimated';
 import { Inbox, FolderOpen, ShieldCheck, Plus } from 'lucide-react-native';
 import { TabKey } from '../types';
@@ -64,31 +66,55 @@ function TabButton({
   onPress: () => void;
   badge?: number;
 }) {
+  const scale = useSharedValue(1);
+  const activeProgress = useSharedValue(isActive ? 1 : 0);
+
+  React.useEffect(() => {
+    activeProgress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
+  }, [isActive]);
+
+  const pressAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const bgAnimStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      activeProgress.value,
+      [0, 1],
+      ['transparent', colors.textPrimary],
+    ),
+  }));
+
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.tabBtn,
-        pressed && { opacity: 0.8 },
-      ]}
+      onPressIn={() => {
+        scale.value = withSpring(0.88, { damping: 15, stiffness: 350 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 200 });
+      }}
+      style={styles.tabBtn}
     >
-      <View
-        style={[
-          styles.iconWrap,
-          isActive && styles.iconWrapActive,
-        ]}
-      >
-        <Icon
-          color={isActive ? colors.bg : colors.textPrimary}
-          size={16}
-          strokeWidth={isActive ? 2.4 : 2}
-        />
-        {badge !== undefined && badge > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
-          </View>
-        )}
-      </View>
+      <Animated.View style={pressAnimStyle}>
+        <Animated.View
+          style={[
+            styles.iconWrap,
+            bgAnimStyle,
+          ]}
+        >
+          <Icon
+            color={isActive ? colors.bg : colors.textPrimary}
+            size={16}
+            strokeWidth={isActive ? 2.4 : 2}
+          />
+          {badge !== undefined && badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+            </View>
+          )}
+        </Animated.View>
+      </Animated.View>
     </Pressable>
   );
 }

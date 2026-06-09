@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import Animated, {
   SlideOutDown,
   FadeIn,
   FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
 } from 'react-native-reanimated';
 import {
   X,
@@ -59,6 +62,18 @@ export function FocusInspector({
   onRegroup,
 }: FocusInspectorProps) {
   const [isZoomed, setIsZoomed] = useState(false);
+  const zoomScale = useSharedValue(1);
+
+  useEffect(() => {
+    zoomScale.value = withSpring(isZoomed ? 1.5 : 1, {
+      damping: 20,
+      stiffness: 150,
+    });
+  }, [isZoomed]);
+
+  const heroAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: zoomScale.value }],
+  }));
   const [isOcrOpen, setIsOcrOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showRegroupMenu, setShowRegroupMenu] = useState(false);
@@ -95,16 +110,22 @@ export function FocusInspector({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          entering={FadeIn.duration(250)}
+          exiting={FadeOut.duration(200)}
+          style={StyleSheet.absoluteFill}
+        >
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.springify().damping(22).stiffness(220)}
-          exiting={SlideOutDown.duration(180)}
+          entering={SlideInDown.springify().damping(28).stiffness(180).mass(0.8)}
+          exiting={SlideOutDown.springify().damping(28).stiffness(240)}
           style={styles.sheet}
         >
           <View style={styles.sheetPanel}>
@@ -135,11 +156,11 @@ export function FocusInspector({
             >
               {/* Hero image */}
               <View style={styles.heroWrap}>
-                <Image
+                <Animated.Image
                   source={{ uri: item.imageUrl }}
                   style={[
                     styles.heroImg,
-                    isZoomed && { transform: [{ scale: 1.5 }] },
+                    heroAnimatedStyle,
                   ]}
                   resizeMode="cover"
                 />
@@ -256,7 +277,7 @@ export function FocusInspector({
 
                 {isOcrOpen && (
                   <Animated.View
-                    entering={FadeIn.duration(150)}
+                    entering={FadeIn.duration(250).springify()}
                     exiting={FadeOut.duration(120)}
                   >
                     <View style={styles.ocrPanel}>
@@ -340,7 +361,7 @@ export function FocusInspector({
 
                 {showRegroupMenu && (
                   <Animated.View
-                    entering={FadeIn.duration(150)}
+                    entering={FadeIn.springify().damping(20).stiffness(200)}
                     style={styles.regroupMenu}
                   >
                     <Text style={styles.regroupLabel}>

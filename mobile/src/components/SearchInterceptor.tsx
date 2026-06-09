@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TextInput, Text, StyleSheet, Platform } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { colors, fonts, radii } from '../theme/colors';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { colors, fonts } from '../theme/colors';
 
 interface SearchInterceptorProps {
   value: string;
@@ -14,12 +22,47 @@ export function SearchInterceptor({
   onChangeText,
   matchCount,
 }: SearchInterceptorProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const shimmerOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (isFocused) {
+      shimmerOpacity.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      shimmerOpacity.value = withTiming(0, { duration: 300 });
+    }
+  }, [isFocused, shimmerOpacity]);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: shimmerOpacity.value,
+  }));
+
   return (
     <View style={styles.container}>
-      <View style={styles.box}>
-        <View style={styles.icon}>
-          <Search color={colors.textSecondary} size={14} strokeWidth={2.2} />
+      <View
+        style={[
+          styles.box,
+          isFocused && styles.boxFocused,
+        ]}
+      >
+        {/* Shimmer glow overlay */}
+        <Animated.View
+          style={[styles.shimmerOverlay, shimmerStyle]}
+          pointerEvents="none"
+        />
+
+        {/* Search icon with accent glow */}
+        <View style={styles.iconContainer}>
+          <Search color={colors.accentCoral} size={14} strokeWidth={2.2} />
         </View>
+
         <TextInput
           value={value}
           onChangeText={onChangeText}
@@ -29,7 +72,10 @@ export function SearchInterceptor({
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
         />
+
         <View style={styles.countPill}>
           <Text style={styles.countText}>
             {matchCount} {matchCount === 1 ? 'ITEM' : 'ITEMS'}
@@ -42,46 +88,66 @@ export function SearchInterceptor({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 18,
+    marginBottom: 14,
   },
   box: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glassBgStrong,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 14,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
     paddingHorizontal: 12,
-    height: 40,
-    shadowColor: colors.shadowGlass,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 1,
+    height: 44,
+    overflow: 'hidden',
+    // Outer shadow for depth
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  icon: {
-    marginRight: 8,
+  boxFocused: {
+    borderColor: 'rgba(52, 211, 153, 0.25)',
+  },
+  shimmerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(52, 211, 153, 0.04)',
+    borderRadius: 16,
+  },
+  iconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   input: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: fonts.body,
     paddingVertical: 0,
+    ...Platform.select({
+      android: { paddingTop: 0, paddingBottom: 0 },
+    }),
   },
   countPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: colors.glassBg,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginLeft: 6,
   },
   countText: {
-    fontSize: 8.5,
-    color: colors.textPrimary,
+    fontSize: 8,
+    color: colors.textSecondary,
     fontFamily: fonts.mono,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

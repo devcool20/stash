@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+stash_db.json
+uploads/
