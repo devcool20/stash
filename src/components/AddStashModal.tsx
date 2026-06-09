@@ -253,11 +253,19 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
   };
 
   return (
-    <div id="add-stash-overlay" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      id="add-stash-overlay"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 180, mass: 0.8 }}
         id="add-stash-modal-box"
         className="glass-panel-base glass-border-diagonal w-full max-w-lg overflow-hidden rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.9)] bg-black/40 text-white"
       >
@@ -512,6 +520,6 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
           </AnimatePresence>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

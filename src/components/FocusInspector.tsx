@@ -48,7 +48,14 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
   ];
 
   return (
-    <div id="inspector-overlay" className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[12px] overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      id="inspector-overlay"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-[12px] overflow-hidden"
+    >
       {/* Click outside to close */}
       <div className="absolute inset-0 cursor-default" onClick={onClose} />
 
@@ -56,7 +63,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 26, stiffness: 220 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 180, mass: 0.8 }}
         id="detail-inspector-sheet"
         className="glass-panel-base glass-border-diagonal w-full max-w-xl h-[88%] rounded-t-[32px] overflow-hidden bg-black/50 backdrop-blur-[35px] flex flex-col z-10"
       >
@@ -212,9 +219,10 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
             <AnimatePresence>
               {showRegroupMenu && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: -210 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ type: 'spring', damping: 20, stiffness: 200 }}
                   id="regroup-menu-dropdown"
                   className="absolute bottom-full left-0 right-0 mb-3 bg-[#0a0a0c]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl space-y-1 z-30"
                 >
@@ -251,6 +259,6 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
           </button>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 }

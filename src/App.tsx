@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Sparkles, Inbox, Command, Info, Smartphone, Monitor, Wifi, Battery } from 'lucide-react';
+import Lottie from 'lottie-react';
+import birdyAnimation from './birdy.json';
 import { db } from './database';
 import { StashItem, ActiveCategory } from './types';
 import BottomBar from './components/BottomBar';
@@ -24,6 +26,7 @@ export default function App() {
   // Interactive sheet modals controls
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [focusedItem, setFocusedItem] = useState<StashItem | null>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // Mobile App Simulator State
   const [isMobileMode, setIsMobileMode] = useState(true);
@@ -135,57 +138,50 @@ export default function App() {
       <div className="flex flex-col h-full">
         {/* Brand header */}
         <header className="flex items-center justify-between mb-5 pt-1 shrink-0" id="main-app-header">
-          <div className="flex items-center space-x-2">
-            <div className="relative w-8 h-8 rounded-lg bg-white text-black flex items-center justify-center font-display font-bold text-base shadow-[0_0_15px_rgba(255,255,255,0.12)] overflow-hidden">
-              <span className="relative z-10">S</span>
-              <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-gray-300 opacity-25" />
-            </div>
-            <div>
-              <h1 className="font-display font-medium text-sm tracking-tight text-white leading-none">STASH</h1>
-              <span className="text-[8px] font-mono tracking-widest text-[#8A8A93] uppercase">LOCAL-FIRST INBOX</span>
-            </div>
+          <div className="flex flex-col">
+            <h1 className="font-display font-medium text-lg tracking-tight text-white leading-none">STASH</h1>
+            <span className="text-[8px] font-mono tracking-widest text-[#8A8A93] uppercase mt-1">LOCAL-FIRST INBOX</span>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {/* Sync Status Icon */}
-            <div className="flex items-center space-x-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${isSyncedOnline ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
-              <span className="text-[8px] tracking-widest text-[#8A8A93] font-mono font-bold uppercase hidden mini:inline">
-                {isSyncedOnline ? 'ONLINE' : 'OFFLINE'}
-              </span>
-            </div>
-
-            {/* Quick Ingest Button */}
-            <button
-              onClick={() => setIsAddOpen(true)}
-              className="px-2 py-1 rounded-full bg-white/5 border border-white/5 text-gray-400 hover:text-white transition-colors text-[9px] font-mono flex items-center space-x-1 cursor-pointer"
-            >
-              <Command className="w-2.5 h-2.5 text-white" />
-              <span>INGEST</span>
-            </button>
+          <div className="w-9 h-9 flex items-center justify-center shrink-0">
+            <Lottie 
+              animationData={birdyAnimation} 
+              loop={true} 
+              className="w-9 h-9"
+            />
           </div>
         </header>
 
         {/* Dynamic Search Box interceptor */}
         {activeTab !== 'profile' && (
-          <div className="mb-4 relative z-20 shrink-0" id="search-interceptor-box">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                <Search className="w-3.5 h-3.5 text-gray-400" />
+          <div className="mb-3.5 relative z-20 shrink-0" id="search-interceptor-box">
+            <div className={`relative flex items-center h-11 px-3 bg-white/[0.04] border ${searchFocused ? 'border-emerald-500/30 ring-1 ring-emerald-500/15' : 'border-white/[0.06]'} rounded-2xl transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)]`}>
+              
+              {/* Highlight shimmer glow overlay */}
+              <div className={`absolute inset-0 bg-emerald-500/[0.02] rounded-2xl transition-opacity duration-300 pointer-events-none ${searchFocused ? 'opacity-100' : 'opacity-0'}`} />
+
+              {/* Glowing Icon Wrapper */}
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/10 text-emerald-400 shrink-0 z-10 mr-2.5">
+                <Search className="w-3.5 h-3.5" />
               </div>
+
               <input
                 type="text"
                 id="search-input"
-                placeholder="Search index metadata..."
+                placeholder="Search your vault..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/5 rounded-xl pl-8 pr-16 py-2 text-xs outline-none focus:border-white/20 text-white font-sans placeholder:text-gray-500 hover:bg-white/8 transition-all"
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                className="flex-1 bg-transparent border-none outline-none text-xs text-white placeholder-gray-500 z-10"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                <span className="font-mono text-[8px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 uppercase font-bold">
-                  {filteredItems.length} Match
+
+              <div className="z-10 ml-2">
+                <span className="font-mono text-[8px] tracking-wider px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/[0.08] text-gray-400 uppercase font-bold">
+                  {filteredItems.length} {filteredItems.length === 1 ? 'Match' : 'Matches'}
                 </span>
               </div>
+
             </div>
           </div>
         )}

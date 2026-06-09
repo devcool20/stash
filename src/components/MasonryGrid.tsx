@@ -42,10 +42,11 @@ export default function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
       <div className="flex flex-col space-y-4">
         {items
           .filter((_, idx) => idx % 2 === 0)
-          .map((item) => (
+          .map((item, idx) => (
             <GridCard 
               key={item.id} 
               item={item} 
+              index={idx * 2}
               onItemClick={onItemClick} 
               getCategoryIcon={getCategoryIcon}
               getRelativeTime={getRelativeTime}
@@ -57,10 +58,11 @@ export default function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
       <div className="flex flex-col space-y-4 pt-6">
         {items
           .filter((_, idx) => idx % 2 !== 0)
-          .map((item) => (
+          .map((item, idx) => (
             <GridCard 
               key={item.id} 
               item={item} 
+              index={idx * 2 + 1}
               onItemClick={onItemClick} 
               getCategoryIcon={getCategoryIcon}
               getRelativeTime={getRelativeTime}
@@ -74,12 +76,13 @@ export default function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
 interface GridCardProps {
   key?: string;
   item: StashItem;
+  index: number;
   onItemClick: (item: StashItem) => void;
   getCategoryIcon: (category: string) => React.ReactNode;
   getRelativeTime: (isoString: string) => string;
 }
 
-function GridCard({ item, onItemClick, getCategoryIcon, getRelativeTime }: GridCardProps) {
+function GridCard({ item, index, onItemClick, getCategoryIcon, getRelativeTime }: GridCardProps) {
   const isProcessing = item.status === 'processing';
 
   if (isProcessing) {
@@ -107,7 +110,15 @@ function GridCard({ item, onItemClick, getCategoryIcon, getRelativeTime }: GridC
       onClick={() => onItemClick(item)}
       id={`stash-card-${item.id}`}
       className="glass-panel-interactive glass-border-diagonal overflow-hidden rounded-2xl cursor-pointer w-full group relative"
-      whileTap={{ scale: 0.98 }}
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ 
+        type: 'spring', 
+        damping: 25, 
+        stiffness: 180, 
+        delay: Math.min(index * 0.04, 0.4) 
+      }}
+      whileTap={{ scale: 0.96 }}
     >
       {/* Image Display */}
       {item.imageUrl && (
