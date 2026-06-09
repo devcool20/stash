@@ -229,11 +229,45 @@ class StashDatabase {
       
       if (res.ok) {
         const serverItems = await res.json();
-        if (Array.isArray(serverItems) && serverItems.length > 0) {
-          this.items = serverItems;
-          this.save();
-          this.notify();
-          console.log('[Database] Web sync successful. Ingested items from backend REST server.');
+        if (Array.isArray(serverItems)) {
+          // Track deleted tombstones
+          const deletedIds = JSON.parse(localStorage.getItem('stash_deleted_ids') || '[]');
+          const deletedSet = new Set(deletedIds);
+
+          const serverIds = new Set(serverItems.map(i => i.id));
+          const localIds = new Set(this.items.map(i => i.id));
+
+          // 1. Local-only items to upload to server (restore after server restarts)
+          const localOnlyItems = this.items.filter(i => !serverIds.has(i.id));
+
+          // 2. Server-only items not in cache and not deleted
+          const serverOnlyItems = serverItems.filter(i => !localIds.has(i.id) && !deletedSet.has(i.id));
+
+          // 3. Delete any items on server that have local tombstones
+          for (const id of deletedIds) {
+            if (serverIds.has(id)) {
+              fetch(`/api/items/${id}`, { method: 'DELETE' })
+                .catch(err => console.warn('[Database] Failed to delete item on server:', err));
+            }
+          }
+
+          // 4. Merge items
+          if (serverOnlyItems.length > 0 || localOnlyItems.length > 0) {
+            this.items = [...this.items, ...serverOnlyItems];
+            this.save();
+            this.notify();
+          }
+
+          // 5. Upload local-only items back to server
+          for (const item of localOnlyItems) {
+            fetch('/api/items', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item)
+            }).catch(err => console.warn('[Database] Failed to restore item to server:', err));
+          }
+
+          console.log('[Database] Web sync completed. Local-first merge-sync finished.');
         }
       }
     } catch (e) {
@@ -316,6 +350,16 @@ class StashDatabase {
   public delete(id: string): boolean {
     const initialLen = this.items.length;
     this.items = this.items.filter(item => item.id !== id);
+    
+    // Add to deleted set
+    try {
+      const deletedIds = JSON.parse(localStorage.getItem('stash_deleted_ids') || '[]');
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        localStorage.setItem('stash_deleted_ids', JSON.stringify(deletedIds));
+      }
+    } catch (e) {}
+
     this.save();
     this.notify();
 

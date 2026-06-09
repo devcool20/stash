@@ -236,7 +236,11 @@ app.post('/api/ocr', async (req, res) => {
             },
             {
               type: 'text',
-              text: `Generate a 2-4 word search query to find the exact real-world entity, product, celebrity, or location shown in this image. If there is clear text in the image (like a screenshot header), extract that name.
+              text: `Identify the main subject of this image (e.g. celebrity, product, model, location, brand).
+Generate a precise 2-5 word search query optimized for search engines to retrieve grounded real-world details about it.
+- If it is a product (e.g. phone/shoes), include unique visual layout or features (e.g. "iphone vertical dual camera" or "nike orange midsole sneaker").
+- If it is a person/celebrity, identify them and output their name.
+- If there is readable text or headers (like a screenshot header), extract that name/title.
 Return ONLY valid JSON in this format: {"query": "..."}`
             }
           ]

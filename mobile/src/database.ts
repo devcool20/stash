@@ -199,9 +199,21 @@ class StashDatabase {
   private items: StashItem[] = [];
   private categories: string[] = [];
   private ready: Promise<void>;
+  private listeners: (() => void)[] = [];
 
   constructor() {
     this.ready = this.sync();
+  }
+
+  public onChange(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l());
   }
 
   public async sync() {
@@ -237,10 +249,46 @@ class StashDatabase {
 
       if (res.ok) {
         const serverItems = await res.json();
-        if (Array.isArray(serverItems) && serverItems.length > 0) {
-          console.log(`[Database] Online sync success. Loaded ${serverItems.length} items.`);
-          this.items = serverItems;
-          await this.save();
+        if (Array.isArray(serverItems)) {
+          // Track deleted tombstones
+          const deletedStr = await AsyncStorage.getItem('stash_deleted_ids_v1');
+          const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+          const deletedSet = new Set(deletedIds);
+
+          const serverIds = new Set(serverItems.map(i => i.id));
+          const localIds = new Set(this.items.map(i => i.id));
+
+          // 1. Local-only items to upload to server (restore after server restarts)
+          const localOnlyItems = this.items.filter(i => !serverIds.has(i.id));
+
+          // 2. Server-only items not in cache and not deleted
+          const serverOnlyItems = serverItems.filter(i => !localIds.has(i.id) && !deletedSet.has(i.id));
+
+          // 3. Delete any items on server that have local tombstones
+          for (const id of deletedIds) {
+            if (serverIds.has(id)) {
+              fetch(`${apiUrl}/api/items/${id}`, { method: 'DELETE' })
+                .catch(err => console.warn('[Database] Failed to delete item on server:', err));
+            }
+          }
+
+          // 4. Merge items
+          if (serverOnlyItems.length > 0 || localOnlyItems.length > 0) {
+            this.items = [...this.items, ...serverOnlyItems];
+            await this.save();
+            this.notify();
+          }
+
+          // 5. Upload local-only items back to server
+          for (const item of localOnlyItems) {
+            fetch(`${apiUrl}/api/items`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item)
+            }).catch(err => console.warn('[Database] Failed to restore item to server:', err));
+          }
+
+          console.log('[Database] Mobile sync completed. Local-first merge-sync finished.');
         }
       }
     } catch (e: any) {
@@ -270,6 +318,7 @@ class StashDatabase {
       const formatted = clean.charAt(0).toUpperCase() + clean.slice(1);
       this.categories.push(formatted);
       await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
+      this.notify();
     }
     return this.categories;
   }
@@ -278,6 +327,7 @@ class StashDatabase {
     await this.ready;
     this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
     await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
+    this.notify();
   }
 
   public async getAll(): Promise<StashItem[]> {
@@ -328,6 +378,7 @@ class StashDatabase {
     };
     this.items.unshift(newItem);
     await this.save();
+    this.notify();
 
     // Sync to backend asynchronously
     resolveApiUrl().then(apiUrl => {
@@ -355,6 +406,7 @@ class StashDatabase {
     this.items[index].extractedText = ocrText;
     this.items[index].category = category;
     await this.save();
+    this.notify();
 
     // Sync to backend asynchronously
     const updatedBody = this.items[index];
@@ -415,6 +467,7 @@ class StashDatabase {
     }
 
     await this.save();
+    this.notify();
     return updated;
   }
 
@@ -457,6 +510,7 @@ class StashDatabase {
     };
     this.items.unshift(newItem);
     await this.save();
+    this.notify();
 
     // Sync to backend asynchronously
     resolveApiUrl().then(apiUrl => {
@@ -481,6 +535,7 @@ class StashDatabase {
     if (index === -1) return null;
     this.items[index] = { ...this.items[index], ...updates };
     await this.save();
+    this.notify();
 
     // Sync to backend asynchronously
     const updatedBody = this.items[index];
@@ -499,7 +554,19 @@ class StashDatabase {
     await this.ready;
     const initialLen = this.items.length;
     this.items = this.items.filter((item) => item.id !== id);
+    
+    // Add to deleted set
+    try {
+      const deletedStr = await AsyncStorage.getItem('stash_deleted_ids_v1');
+      const deletedIds: string[] = deletedStr ? JSON.parse(deletedStr) : [];
+      if (!deletedIds.includes(id)) {
+        deletedIds.push(id);
+        await AsyncStorage.setItem('stash_deleted_ids_v1', JSON.stringify(deletedIds));
+      }
+    } catch (e) {}
+
     await this.save();
+    this.notify();
 
     // Sync to backend asynchronously
     resolveApiUrl().then(apiUrl => {
@@ -551,6 +618,7 @@ class StashDatabase {
     this.items = [...DEFAULT_ITEMS];
     await this.save();
     await this.resetCategories();
+    this.notify();
 
     // Sync to backend asynchronously
     resolveApiUrl().then(apiUrl => {

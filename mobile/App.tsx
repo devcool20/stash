@@ -30,15 +30,22 @@ export default function App() {
   const [focusedItem, setFocusedItem] = useState<StashItem | null>(null);
   const [focusedVisible, setFocusedVisible] = useState(false);
 
-  const refreshStorage = useCallback(async () => {
+  const refreshStorage = useCallback(async (forceSync = false) => {
     const all = await db.getAll();
     const pending = await db.getPending();
     setItems(all);
     setPendingItems(pending);
+    if (forceSync) {
+      db.sync().catch((err) => console.warn('[App] Sync failed:', err));
+    }
   }, []);
 
   useEffect(() => {
-    refreshStorage();
+    refreshStorage(true); // initial sync on mount
+    const unsubscribe = db.onChange(() => {
+      refreshStorage(false); // update local state from cache on change
+    });
+    return unsubscribe;
   }, [refreshStorage]);
 
   const filteredCount = (() => {
@@ -133,7 +140,7 @@ export default function App() {
                   items={items}
                   searchQuery={searchQuery}
                   onItemClick={handleItemClick}
-                  onItemsChanged={refreshStorage}
+                  onItemsChanged={() => refreshStorage(true)}
                 />
               )}
               {activeTab === 'categories' && (
