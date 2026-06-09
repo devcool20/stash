@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
@@ -25,6 +26,14 @@ if (hasApiKey) {
   console.log('Groq API key found — cloud vision OCR enabled (Llama 4 Scout).');
 } else {
   console.warn('GROQ_API_KEY not set. OCR will return mock responses.');
+}
+
+let ai: GoogleGenAI | null = null;
+if (process.env.GEMINI_API_KEY) {
+  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  console.log('Gemini API key found — celebrity identification via Gemini enabled.');
+} else {
+  console.warn('GEMINI_API_KEY not set. Gemini integration disabled.');
 }
 
 // 1. API Endpoint: Metadata Hydration Parser
@@ -219,12 +228,91 @@ app.post('/api/ocr', async (req, res) => {
   }
 
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  
-  // 1. Step 1: Generate Visual Search Query
+
+  // Fast single-pass pipeline using Gemini 2.0 Flash if available
+  if (process.env.GEMINI_API_KEY && ai) {
+    console.log('[/api/ocr] Gemini API key found. Running fast, single-pass gemini-2.0-flash pipeline...');
+    try {
+      const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+      const geminiPrompt = `Analyze this image in detail. Identify any prominent subjects, including specific products (brand/model), locations (landmarks), text content, or people (especially celebrities/public figures like Shah Rukh Khan, Rohit Shetty, etc. if recognizable).
+
+Return a JSON object with these fields:
+- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
+- "title": a short descriptive title (max 6 words). Use exact names/versions/brands/celebrities if recognizable.
+- "summary": ONE short sentence describing what this image visually shows.
+- "description": a detailed 3-4 sentence description of what is pictured. Include exact names, model numbers, locations, or celebrity identities if recognizable.
+- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
+- "tags": 3-5 single-word tags describing the image content.
+
+Return ONLY valid JSON.`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: geminiPrompt },
+              {
+                inlineData: {
+                  mimeType: cleanMimeType,
+                  data: rawBase64
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const rawContent = geminiResponse.text;
+      console.log('[/api/ocr] Received response from Gemini. Raw content:\n', rawContent);
+
+      if (!rawContent) {
+        throw new Error('Empty response from Gemini.');
+      }
+
+      const jsonText = rawContent.trim();
+      let parsed;
+      try {
+        const firstBrace = jsonText.indexOf('{');
+        const lastBrace = jsonText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonContent = jsonText.substring(firstBrace, lastBrace + 1);
+          parsed = JSON.parse(jsonContent);
+        } else {
+          const cleaned = jsonText.replace(/^```(?:json)?\s*|```\s*$/gi, '').trim();
+          parsed = JSON.parse(cleaned);
+        }
+      } catch (parseErr) {
+        console.error('[/api/ocr] Error parsing JSON from Gemini response:', parseErr);
+        throw parseErr;
+      }
+
+      console.log('[/api/ocr] Successfully parsed JSON result from Gemini. Title:', parsed.title);
+      return res.json({
+        text: parsed.text || '',
+        title: parsed.title || 'Analyzed Image',
+        summary: parsed.summary || '',
+        description: parsed.description || 'Extracted from image.',
+        category: parsed.category || 'Design',
+        tags: parsed.tags || [],
+        imageUrl: hostedImageUrl
+      });
+
+    } catch (err: any) {
+      console.error('[/api/ocr] Gemini pipeline failed, falling back to Groq/Llama pipeline:', err?.message || err);
+    }
+  }
+
+  // Step 1: Classify subject type AND generate search query
   let searchResults = '';
+  let subjectType = 'unknown'; // 'person', 'product', 'location', 'other'
   try {
     const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
-    const queryRequestBody = {
+    const classifyRequestBody = {
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
       messages: [
         {
@@ -236,28 +324,37 @@ app.post('/api/ocr', async (req, res) => {
             },
             {
               type: 'text',
-              text: `Identify the main subject of this image (e.g. celebrity, product, model, location, brand).
-Generate a precise 2-5 word search query optimized for search engines to retrieve grounded real-world details about it.
-- If it is a product (e.g. phone/shoes), include unique visual layout or features (e.g. "iphone vertical dual camera" or "nike orange midsole sneaker").
-- If it is a person/celebrity, identify them and output their name.
-- If there is readable text or headers (like a screenshot header), extract that name/title.
-Return ONLY valid JSON in this format: {"query": "..."}`
+              text: `Classify the main subject of this image AND generate a web search query.
+
+1. "type": one of "person", "product", "location", "text_content", "other"
+   - "person" = human face, portrait, celebrity, selfie
+   - "product" = shoes, phone, watch, clothing, gadget, furniture
+   - "location" = building, landmark, scenery, travel destination
+   - "text_content" = screenshot, article, recipe card, document
+   - "other" = anything else
+2. "query": a 2-5 word search query to find details about this subject
+   - For products: include brand and model (e.g. "Nike Air Force 1", "iPhone 15 Pro")
+   - For locations: include place name (e.g. "Eiffel Tower Paris")
+   - For text/articles: extract the main heading or title
+   - For people: just output "person" (do NOT try to guess their name)
+
+Return ONLY valid JSON: {"type": "...", "query": "..."}`
             }
           ]
         }
       ],
-      max_tokens: 60,
+      max_tokens: 80,
       temperature: 0.1
     };
 
-    console.log('[/api/ocr] Running Step 1: Visual Query Generation...');
+    console.log('[/api/ocr] Running Step 1: Subject Classification + Query Generation...');
     const queryApiRes = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(queryRequestBody)
+      body: JSON.stringify(classifyRequestBody)
     });
 
     if (queryApiRes.ok) {
@@ -273,35 +370,123 @@ Return ONLY valid JSON in this format: {"query": "..."}`
           parsedQueryObj = JSON.parse(rawQueryContent.substring(firstBrace, lastBrace + 1));
         }
       } catch (e) {
-        console.warn('[/api/ocr] Failed to parse visual query JSON');
+        console.warn('[/api/ocr] Failed to parse classification JSON');
       }
 
+      subjectType = parsedQueryObj.type || 'unknown';
       const visualQuery = parsedQueryObj.query || '';
-      if (visualQuery) {
+      console.log(`[/api/ocr] Detected subject type: "${subjectType}"`);
+
+      // Only do web search for non-person subjects (products, locations, text)
+      // For people, web search HURTS because wrong name guesses poison the results
+      if (subjectType !== 'person' && visualQuery && visualQuery !== 'person') {
         console.log(`[/api/ocr] Step 2: Searching DuckDuckGo for: "${visualQuery}"`);
         searchResults = await searchWeb(visualQuery);
         console.log('[/api/ocr] Search Results Retrieved:\n', searchResults);
+      } else {
+        console.log('[/api/ocr] Step 2: SKIPPED web search (subject is a person — direct analysis is more accurate)');
       }
     }
   } catch (err) {
-    console.error('[/api/ocr] Visual query search pipeline failed:', err);
+    console.error('[/api/ocr] Classification pipeline failed:', err);
   }
 
-  // 2. Step 3: Grounded Multimodal Synthesis
-  console.log('[/api/ocr] GROQ_API_KEY is active. Preparing request for meta-llama/llama-4-scout-17b-16e-instruct...');
-
+  // Step 3: Final Analysis
+  // For people: direct analysis without search contamination (proven to work better)
+  // For products/locations: grounded synthesis with search results
   try {
     const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
     console.log(`[/api/ocr] Image base64 payload size: ${(rawBase64.length / 1024).toFixed(1)} KB`);
 
-    const promptText = `Analyze this image in detail. Synthesize it with these web search results to provide exact, real-world, grounded details about the subject (avoid generic descriptions, name specific people/models/locations):
-${searchResults ? `[WEB SEARCH RESULTS]:\n${searchResults}\n` : '[NO WEB SEARCH RESULTS FOUND]'}
+    if (subjectType === 'person' && process.env.GEMINI_API_KEY && ai) {
+      console.log('[/api/ocr] Subject is "person" and Gemini is enabled. Using gemini-2.0-flash...');
+      const geminiPrompt = `Analyze this image in detail. Identify the main person in the image (especially if they are a celebrity or public figure like Shah Rukh Khan, Rohit Shetty, etc.). Return a JSON object with these fields:
+- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
+- "title": a short descriptive title (max 6 words). If a specific person is identified, use their name in the title (e.g. "Shah Rukh Khan", "Rohit Shetty").
+- "summary": ONE short sentence describing what this image visually shows.
+- "description": a detailed 3-4 sentence description of what is pictured. Identify the person by name, describe their appearance, clothing, setting, and any other recognizable features or actions.
+- "category": Always classify as "People".
+- "tags": 3-5 single-word tags describing the image content.
+
+Return ONLY valid JSON.`;
+
+      const geminiResponse = await ai.models.generateContent({
+        model: 'gemini-2.0-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: geminiPrompt },
+              {
+                inlineData: {
+                  mimeType: cleanMimeType,
+                  data: rawBase64
+                }
+              }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: 'application/json'
+        }
+      });
+
+      const rawContent = geminiResponse.text;
+      console.log('[/api/ocr] Received response from Gemini. Raw content:\n', rawContent);
+
+      if (!rawContent) {
+        throw new Error('Empty message response from Gemini.');
+      }
+
+      const jsonText = rawContent.trim();
+      let parsed;
+      try {
+        const firstBrace = jsonText.indexOf('{');
+        const lastBrace = jsonText.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          const jsonContent = jsonText.substring(firstBrace, lastBrace + 1);
+          parsed = JSON.parse(jsonContent);
+        } else {
+          const cleaned = jsonText.replace(/^```(?:json)?\s*|```\s*$/gi, '').trim();
+          parsed = JSON.parse(cleaned);
+        }
+      } catch (parseErr) {
+        console.error('[/api/ocr] Error parsing JSON from Gemini response:', parseErr);
+        throw parseErr;
+      }
+
+      console.log('[/api/ocr] Successfully parsed JSON result from Gemini. Title:', parsed.title);
+      return res.json({
+        text: parsed.text || '',
+        title: parsed.title || 'Analyzed Image',
+        summary: parsed.summary || '',
+        description: parsed.description || 'Extracted from image.',
+        category: parsed.category || 'People',
+        tags: parsed.tags || [],
+        imageUrl: hostedImageUrl
+      });
+    }
+
+    console.log('[/api/ocr] GROQ_API_KEY is active. Preparing request for meta-llama/llama-4-scout-17b-16e-instruct...');
+    // Use different prompts based on whether we have search results
+    const promptText = searchResults
+      ? `Analyze this image in detail. Synthesize it with these web search results to provide exact, real-world, grounded details about the subject (avoid generic descriptions, name specific people/models/locations):
+${`[WEB SEARCH RESULTS]:\n${searchResults}\n`}
 
 Return a JSON object with these fields:
 - "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
 - "title": a short descriptive title (max 6 words). Ensure it uses the exact names/versions from the search results if available.
 - "summary": ONE short sentence describing what this image visually shows.
 - "description": a detailed 3-4 sentence description of what is pictured. Include exact names, model numbers, locations, and specifications found in the search results.
+- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
+- "tags": 3-5 single-word tags describing the image content.
+
+Return ONLY valid JSON.`
+      : `Analyze this image in detail. Return a JSON object with these fields:
+- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
+- "title": a short descriptive title (max 6 words).
+- "summary": ONE short sentence describing what this image visually shows.
+- "description": a detailed 3-4 sentence description of what is pictured. If it is a person, try to identify who they are based on recognizable features. Describe their appearance, clothing, setting, and any other details.
 - "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
 - "tags": 3-5 single-word tags describing the image content.
 
