@@ -168,6 +168,9 @@ async function uploadLocalImageIfNecessary(item: StashItem, apiUrl: string): Pro
       }
     } catch (err) {
       console.warn('[Database] Failed to upload local image during sync:', err);
+      // Self-healing: if file does not exist or cannot be read, replace with placeholder
+      console.log(`[Database] Local image file not found or unreadable. Replacing with placeholder: ${item.imageUrl}`);
+      item.imageUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
     }
   }
   return item;
@@ -177,24 +180,17 @@ class StashDatabase {
   private items: StashItem[] = [];
   private categories: string[] = [];
   private ready: Promise<void>;
+  private resolveReady!: () => void;
   private listeners: (() => void)[] = [];
 
   constructor() {
-    this.ready = this.sync();
+    this.ready = new Promise<void>((resolve) => {
+      this.resolveReady = resolve;
+    });
+    this.initialize();
   }
 
-  public onChange(listener: () => void): () => void {
-    this.listeners.push(listener);
-    return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
-    };
-  }
-
-  private notify() {
-    this.listeners.forEach(l => l());
-  }
-
-  public async sync() {
+  private async initialize() {
     try {
       // 1. Load local AsyncStorage cache first for instant load
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
@@ -212,8 +208,35 @@ class StashDatabase {
         this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
         await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(this.categories));
       }
+    } catch (e) {
+      console.warn('[Database] Failed to load local cache:', e);
+      this.items = [...DEFAULT_ITEMS];
+      this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+    } finally {
+      this.resolveReady();
+      this.notify();
+    }
 
-      // 2. Fetch fresh items from the online Render backend database
+    // Run the online sync in the background
+    this.sync().catch((err) => {
+      console.warn('[Database] Background sync initialization error:', err);
+    });
+  }
+
+  public onChange(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l());
+  }
+
+  public async sync() {
+    try {
+      // Fetch fresh items from the online Render backend database
       const apiUrl = await resolveApiUrl();
       console.log(`[Database] Syncing with online database: ${apiUrl}/api/items`);
       
@@ -583,31 +606,16 @@ class StashDatabase {
     const updatedBody = this.items[index];
     resolveApiUrl().then(async (apiUrl) => {
       let itemToSync = { ...updatedBody };
-      if (itemToSync.type === 'image' && itemToSync.imageUrl && itemToSync.imageUrl.startsWith('file://')) {
-        try {
-          const base64 = await FileSystem.readAsStringAsync(itemToSync.imageUrl, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          if (base64) {
-            const uploadRes = await fetch(`${apiUrl}/api/upload`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ base64, mimeType: 'image/png' })
-            });
-            if (uploadRes.ok) {
-              const uploadData = await uploadRes.json();
-              if (uploadData && uploadData.imageUrl) {
-                console.log(`[Database] Uploaded local image to server on update: ${uploadData.imageUrl}`);
-                itemToSync.imageUrl = uploadData.imageUrl;
-                this.items[index].imageUrl = uploadData.imageUrl;
-                await this.save();
-                this.notify();
-              }
-            }
-          }
-        } catch (err) {
-          console.warn('[Database] Failed to upload local image on update sync:', err);
+      try {
+        const uploaded = await uploadLocalImageIfNecessary(itemToSync, apiUrl);
+        if (uploaded.imageUrl !== updatedBody.imageUrl) {
+          this.items[index].imageUrl = uploaded.imageUrl;
+          await this.save();
+          this.notify();
+          itemToSync = uploaded;
         }
+      } catch (err) {
+        console.warn('[Database] Failed to upload local image on update sync:', err);
       }
 
       const safePayload = {
