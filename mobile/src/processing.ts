@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { autoCategorize } from './database';
+import { autoCategorize } from './categories';
 
 interface ProcessedResult {
   title: string;

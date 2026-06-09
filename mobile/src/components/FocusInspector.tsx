@@ -35,6 +35,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
+import { BlurView } from 'expo-blur';
 import { StashItem, CategoryKey } from '../types';
 import { colors, fonts, radii } from '../theme/colors';
 
@@ -129,6 +130,13 @@ export function FocusInspector({
           style={styles.sheet}
         >
           <View style={styles.sheetPanel}>
+            {Platform.OS !== 'web' && (
+              <BlurView
+                intensity={45}
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+              />
+            )}
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
@@ -434,7 +442,7 @@ const styles = StyleSheet.create({
   sheetPanel: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: colors.bg,
+    backgroundColor: 'rgba(10, 10, 10, 0.65)',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
@@ -452,7 +460,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 18,
     paddingBottom: 14,
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSubtle,
   },
@@ -666,7 +674,7 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
     borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
   },

@@ -16,6 +16,7 @@ import { colors, fonts } from '../theme/colors';
 interface StashScreenProps {
   items: StashItem[];
   searchQuery: string;
+  selectedCategory: string;
   onItemClick: (item: StashItem) => void;
   onItemsChanged: () => void;
 }
@@ -23,6 +24,7 @@ interface StashScreenProps {
 export function StashScreen({
   items,
   searchQuery,
+  selectedCategory,
   onItemClick,
   onItemsChanged,
 }: StashScreenProps) {
@@ -36,10 +38,15 @@ export function StashScreen({
       dataset = dataset.filter(
         (i) => i.status === 'ready' || i.status === 'processing',
       );
+      if (selectedCategory !== 'All') {
+        dataset = dataset.filter(
+          (i) => i.category.toLowerCase() === selectedCategory.toLowerCase(),
+        );
+      }
       setFiltered(dataset);
     };
     run();
-  }, [searchQuery, items]);
+  }, [searchQuery, items, selectedCategory]);
 
   const onRefresh = async () => {
     setRefreshing(true);

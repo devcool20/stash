@@ -11,6 +11,7 @@ import { db } from './src/database';
 import { StashItem, TabKey, CategoryKey } from './src/types';
 import { AppHeader } from './src/components/AppHeader';
 import { SearchInterceptor } from './src/components/SearchInterceptor';
+import { CategorySlider } from './src/components/CategorySlider';
 
 import { BottomBar } from './src/components/BottomBar';
 import { BackgroundOrbs } from './src/components/BackgroundOrbs';
@@ -29,12 +30,16 @@ export default function App() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [focusedItem, setFocusedItem] = useState<StashItem | null>(null);
   const [focusedVisible, setFocusedVisible] = useState(false);
+  const [categories, setCategories] = useState<string[]>(['Shopping', 'Recipes', 'Travel', 'Articles', 'Design']);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const refreshStorage = useCallback(async (forceSync = false) => {
     const all = await db.getAll();
     const pending = await db.getPending();
+    const cats = await db.getCategories();
     setItems(all);
     setPendingItems(pending);
+    setCategories(cats);
     if (forceSync) {
       db.sync().catch((err) => console.warn('[App] Sync failed:', err));
     }
@@ -49,14 +54,20 @@ export default function App() {
   }, [refreshStorage]);
 
   const filteredCount = (() => {
-    if (!searchQuery.trim()) return items.length;
+    let dataset = items.filter((i) => i.status === 'ready' || i.status === 'processing');
+    if (selectedCategory !== 'All') {
+      dataset = dataset.filter(
+        (i) => i.category.toLowerCase() === selectedCategory.toLowerCase()
+      );
+    }
+    if (!searchQuery.trim()) return dataset.length;
     const tokens = searchQuery
       .toLowerCase()
       .trim()
       .split(/\s+/)
       .filter((t) => t.length > 0);
-    if (tokens.length === 0) return items.length;
-    return items.filter((item) => {
+    if (tokens.length === 0) return dataset.length;
+    return dataset.filter((item) => {
       const s = `${item.title} ${item.description || ''} ${
         item.extractedText || ''
       } ${item.sourceUrl || ''} ${item.category}`.toLowerCase();
@@ -126,11 +137,18 @@ export default function App() {
             <View style={styles.headerArea}>
               <AppHeader />
               {showSearch && (
-                <SearchInterceptor
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  matchCount={filteredCount}
-                />
+                <>
+                  <SearchInterceptor
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    matchCount={filteredCount}
+                  />
+                  <CategorySlider
+                    categories={categories}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={setSelectedCategory}
+                  />
+                </>
               )}
             </View>
 
@@ -139,6 +157,7 @@ export default function App() {
                 <StashScreen
                   items={items}
                   searchQuery={searchQuery}
+                  selectedCategory={selectedCategory}
                   onItemClick={handleItemClick}
                   onItemsChanged={() => refreshStorage(true)}
                 />
