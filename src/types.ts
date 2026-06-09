@@ -9,7 +9,7 @@ export interface StashItem {
   category: string;
   extractedText?: string;
   summary?: string;
-  status: 'processing' | 'ready';
+  status: 'pending' | 'processing' | 'ready';
   createdAt: string;
 }
 

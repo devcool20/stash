@@ -283,7 +283,132 @@ class StashDatabase {
   }
 
   public getAll(): StashItem[] {
-    return [...this.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return [...this.items]
+      .filter((i) => i.status !== 'pending')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public getPending(): StashItem[] {
+    return [...this.items]
+      .filter((i) => i.status === 'pending')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  public getInboxCount(): number {
+    return this.items.filter((i) => i.status === 'pending').length;
+  }
+
+  public addPending(item: {
+    type: 'image' | 'link';
+    title: string;
+    description?: string;
+    imageUrl?: string;
+    category?: string;
+  }): StashItem {
+    if (item.category) {
+      this.addCategory(item.category);
+    }
+    const newItem: StashItem = {
+      id: `pending-${Date.now()}-${Math.floor(Math.random() * 1050)}`,
+      type: item.type,
+      title: item.title,
+      description: item.description || '',
+      imageUrl: item.imageUrl,
+      category: item.category || 'Design',
+      extractedText: '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    } as StashItem;
+    this.items.unshift(newItem);
+    this.save();
+    this.notify();
+
+    // Sync to backend asynchronously
+    fetch(resolveUrl('/api/items'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem)
+    }).catch(err => console.warn('[Database] Background sync failed for addPending:', err));
+
+    return newItem;
+  }
+
+  public async processBatch(ids: string[]): Promise<StashItem[]> {
+    const pendingItems = ids
+      .map((id) => this.items.find((i) => i.id === id))
+      .filter((i): i is StashItem => i !== undefined && i.status === 'pending');
+
+    const updated: StashItem[] = [];
+    for (const item of pendingItems) {
+      try {
+        let finalTitle = item.title;
+        let finalDesc = item.description || '';
+        let finalOcr = '';
+        let finalCategory = item.category || 'Design';
+        let finalImg = item.imageUrl || '';
+
+        if (item.type === 'image' && item.imageUrl) {
+          let base64Data = '';
+          if (item.imageUrl.startsWith('data:')) {
+            base64Data = item.imageUrl;
+          } else {
+            const imgRes = await fetch(item.imageUrl);
+            const blob = await imgRes.blob();
+            base64Data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          }
+
+          const ocrPayload = {
+            base64: base64Data,
+            mimeType: 'image/png'
+          };
+
+          const res = await fetch(resolveUrl('/api/ocr'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ocrPayload)
+          });
+          
+          if (res.ok) {
+            const ocrData = await res.json();
+            finalOcr = ocrData.text || '';
+            finalTitle = ocrData.title || finalTitle;
+            finalDesc = ocrData.description || ocrData.summary || finalDesc;
+            finalImg = ocrData.imageUrl || finalImg;
+            finalCategory = ocrData.category || finalCategory;
+          }
+        }
+
+        const idx = this.items.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+          this.items[idx].status = 'ready';
+          this.items[idx].title = finalTitle;
+          this.items[idx].description = finalDesc;
+          this.items[idx].extractedText = finalOcr;
+          this.items[idx].category = finalCategory;
+          this.items[idx].imageUrl = finalImg;
+          
+          this.addCategory(finalCategory);
+          updated.push(this.items[idx]);
+
+          await fetch(resolveUrl(`/api/items/${item.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.items[idx])
+          }).catch(err => console.warn('[Database] Background sync failed for processBatch item:', err));
+        }
+      } catch (err) {
+        console.error('Failed to process batch item:', item.id, err);
+      }
+    }
+
+    this.save();
+    this.notify();
+    return updated;
   }
 
   // Tokenizing-based Full Text Search (simulating FTS5)

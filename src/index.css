@@ -70,3 +70,32 @@
   background: rgba(255, 255, 255, 0.24);
 }
 
+@keyframes waveFlow1 {
+  0% {
+    transform: translate(0px, 0px);
+  }
+  50% {
+    transform: translate(-50px, 2px);
+  }
+  100% {
+    transform: translate(-100px, 0px);
+  }
+}
+@keyframes waveFlow2 {
+  0% {
+    transform: translate(-100px, 0px);
+  }
+  50% {
+    transform: translate(-50px, -2px);
+  }
+  100% {
+    transform: translate(0px, 0px);
+  }
+}
+.wave-anim-1 {
+  animation: waveFlow1 3.5s linear infinite;
+}
+.wave-anim-2 {
+  animation: waveFlow2 2.5s linear infinite;
+}
+

@@ -1,16 +1,17 @@
-import { Inbox, FolderHeart, ShieldCheck } from 'lucide-react';
+import { Inbox, FolderOpen, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface BottomBarProps {
   activeTab: 'stash' | 'categories' | 'profile';
   setActiveTab: (tab: 'stash' | 'categories' | 'profile') => void;
   onAddClick: () => void;
+  pendingCount?: number;
 }
 
-export default function BottomBar({ activeTab, setActiveTab, onAddClick }: BottomBarProps) {
+export default function BottomBar({ activeTab, setActiveTab, onAddClick, pendingCount = 0 }: BottomBarProps) {
   const tabs = [
     { id: 'stash', label: 'Stash', icon: Inbox },
-    { id: 'categories', label: 'Categories', icon: FolderHeart },
+    { id: 'categories', label: 'Inbox', icon: FolderOpen },
     { id: 'profile', label: 'Profile', icon: ShieldCheck },
   ] as const;
 
@@ -40,12 +41,20 @@ export default function BottomBar({ activeTab, setActiveTab, onAddClick }: Botto
                   />
                 )}
                 
-                <Icon 
-                  id={`tab-icon-${tab.id}`}
-                  className={`w-5 h-5 mb-0.5 transition-all duration-300 relative z-10 ${
-                    isActive ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-gray-400 group-hover:text-white group-hover:scale-105'
-                  }`}
-                />
+                <div className="relative">
+                  <Icon 
+                    id={`tab-icon-${tab.id}`}
+                    className={`w-5 h-5 mb-0.5 transition-all duration-300 relative z-10 ${
+                      isActive ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'text-gray-400 group-hover:text-white group-hover:scale-105'
+                    }`}
+                  />
+                  {tab.id === 'categories' && pendingCount > 0 && (
+                    <span className="absolute -top-1 -right-2 min-w-[14px] h-[14px] rounded-full bg-white text-black font-mono text-[7.5px] font-bold flex items-center justify-center border border-black px-0.5 z-20">
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </span>
+                  )}
+                </div>
+                
                 <span 
                   className={`text-[10px] uppercase font-display tracking-widest relative z-10 transition-colors duration-300 ${
                     isActive ? 'text-white font-medium' : 'text-gray-500 group-hover:text-gray-300'
