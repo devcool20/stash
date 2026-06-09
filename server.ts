@@ -758,10 +758,23 @@ const DEFAULT_ITEMS = [
 let dbItems: any[] = [];
 
 function loadDb() {
+  const placeholder = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
   if (fs.existsSync(DB_FILE)) {
     try {
       dbItems = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
       console.log(`[Database] Loaded ${dbItems.length} items from ${DB_FILE}`);
+      
+      let cleaned = false;
+      dbItems.forEach(item => {
+        if (item.imageUrl && item.imageUrl.startsWith('file://')) {
+          item.imageUrl = placeholder;
+          cleaned = true;
+        }
+      });
+      if (cleaned) {
+        console.log('[Database] Auto-cleaned residual file:// URLs from database.');
+        saveDb();
+      }
     } catch (e) {
       dbItems = [...DEFAULT_ITEMS];
       saveDb();
