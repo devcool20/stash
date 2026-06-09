@@ -110,6 +110,38 @@ app.get('/api/metadata', async (req, res) => {
     });
   }
 });
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'");
+}
+
+async function searchWeb(query: string): Promise<string> {
+  try {
+    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
+      }
+    });
+    if (!res.ok) return '';
+    const html = await res.text();
+    const matches = html.matchAll(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g);
+    const snippets: string[] = [];
+    for (const match of matches) {
+      const cleanSnippet = decodeHtmlEntities(match[1].replace(/<[^>]*>/g, '').trim());
+      snippets.push(cleanSnippet);
+      if (snippets.length >= 4) break;
+    }
+    return snippets.join('\n\n');
+  } catch (err) {
+    console.error('Web search failed:', err);
+    return '';
+  }
+}
 
 // 2. API Endpoint: Vision OCR & Image Analysis
 // Uses Groq's Llama 4 Scout Vision API to extract OCR text,
@@ -187,11 +219,89 @@ app.post('/api/ocr', async (req, res) => {
   }
 
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  
+  // 1. Step 1: Generate Visual Search Query
+  let searchResults = '';
+  try {
+    const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+    const queryRequestBody = {
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${cleanMimeType};base64,${rawBase64}` }
+            },
+            {
+              type: 'text',
+              text: `Generate a 2-4 word search query to find the exact real-world entity, product, celebrity, or location shown in this image. If there is clear text in the image (like a screenshot header), extract that name.
+Return ONLY valid JSON in this format: {"query": "..."}`
+            }
+          ]
+        }
+      ],
+      max_tokens: 60,
+      temperature: 0.1
+    };
+
+    console.log('[/api/ocr] Running Step 1: Visual Query Generation...');
+    const queryApiRes = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(queryRequestBody)
+    });
+
+    if (queryApiRes.ok) {
+      const queryData = await queryApiRes.json();
+      const rawQueryContent = queryData?.choices?.[0]?.message?.content?.trim() || '';
+      console.log('[/api/ocr] Step 1 Raw Output:', rawQueryContent);
+      
+      let parsedQueryObj: any = {};
+      try {
+        const firstBrace = rawQueryContent.indexOf('{');
+        const lastBrace = rawQueryContent.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          parsedQueryObj = JSON.parse(rawQueryContent.substring(firstBrace, lastBrace + 1));
+        }
+      } catch (e) {
+        console.warn('[/api/ocr] Failed to parse visual query JSON');
+      }
+
+      const visualQuery = parsedQueryObj.query || '';
+      if (visualQuery) {
+        console.log(`[/api/ocr] Step 2: Searching DuckDuckGo for: "${visualQuery}"`);
+        searchResults = await searchWeb(visualQuery);
+        console.log('[/api/ocr] Search Results Retrieved:\n', searchResults);
+      }
+    }
+  } catch (err) {
+    console.error('[/api/ocr] Visual query search pipeline failed:', err);
+  }
+
+  // 2. Step 3: Grounded Multimodal Synthesis
   console.log('[/api/ocr] GROQ_API_KEY is active. Preparing request for meta-llama/llama-4-scout-17b-16e-instruct...');
 
   try {
     const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
     console.log(`[/api/ocr] Image base64 payload size: ${(rawBase64.length / 1024).toFixed(1)} KB`);
+
+    const promptText = `Analyze this image in detail. Synthesize it with these web search results to provide exact, real-world, grounded details about the subject (avoid generic descriptions, name specific people/models/locations):
+${searchResults ? `[WEB SEARCH RESULTS]:\n${searchResults}\n` : '[NO WEB SEARCH RESULTS FOUND]'}
+
+Return a JSON object with these fields:
+- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
+- "title": a short descriptive title (max 6 words). Ensure it uses the exact names/versions from the search results if available.
+- "summary": ONE short sentence describing what this image visually shows.
+- "description": a detailed 3-4 sentence description of what is pictured. Include exact names, model numbers, locations, and specifications found in the search results.
+- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
+- "tags": 3-5 single-word tags describing the image content.
+
+Return ONLY valid JSON.`;
 
     const requestBody = {
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -205,15 +315,7 @@ app.post('/api/ocr', async (req, res) => {
             },
             {
               type: 'text',
-              text: `Analyze this image in detail. Return a JSON object with these fields:
-- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
-- "title": a short descriptive title (max 6 words).
-- "summary": ONE short sentence describing what this image visually shows (used for search queries).
-- "description": a detailed 3-4 sentence description of what is pictured. If it's an object or animal (e.g. a dog), describe its breed, color, appearance, and mood/setting in a user-friendly way.
-- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
-- "tags": 3-5 single-word tags describing the image content.
-
-Return ONLY valid JSON.`
+              text: promptText
             }
           ]
         }
