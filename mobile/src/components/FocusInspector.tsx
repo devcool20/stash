@@ -40,6 +40,7 @@ import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
 import { StashItem, CategoryKey } from '../types';
 import { colors, fonts, radii } from '../theme/colors';
+import { resolveImageUri } from '../processing';
 
 interface FocusInspectorProps {
   item: StashItem | null;
@@ -181,7 +182,7 @@ export function FocusInspector({
               {/* Hero image */}
               <View style={styles.heroWrap}>
                 <Animated.Image
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: resolveImageUri(item.imageUrl) }}
                   style={[
                     styles.heroImg,
                     heroAnimatedStyle,

@@ -22,6 +22,7 @@ import {
 import { db } from '../database';
 import { StashItem } from '../types';
 import { colors, fonts } from '../theme/colors';
+import { resolveImageUri } from '../processing';
 
 interface CategoriesScreenProps {
   pendingItems: StashItem[];
@@ -135,7 +136,7 @@ export function CategoriesScreen({
 
                 {item.imageUrl && (
                   <Image
-                    source={{ uri: item.imageUrl }}
+                    source={{ uri: resolveImageUri(item.imageUrl) }}
                     style={styles.itemThumb}
                     resizeMode="cover"
                   />

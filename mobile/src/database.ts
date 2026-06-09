@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StashItem, CategoryKey } from './types';
 import { processImagesInBatch, resolveApiUrl } from './processing';
 import { autoCategorize } from './categories';
+import * as FileSystem from 'expo-file-system';
 
 const STORAGE_KEY = 'stash_items_v1';
 
@@ -145,6 +146,33 @@ export const DEFAULT_ITEMS: StashItem[] = [
 
 const CATEGORIES_KEY = 'stash_categories_v1';
 
+async function uploadLocalImageIfNecessary(item: StashItem, apiUrl: string): Promise<StashItem> {
+  if (item.type === 'image' && item.imageUrl && item.imageUrl.startsWith('file://')) {
+    try {
+      const base64 = await FileSystem.readAsStringAsync(item.imageUrl, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (base64) {
+        const res = await fetch(`${apiUrl}/api/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base64, mimeType: 'image/png' })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.imageUrl) {
+            console.log(`[Database] Successfully uploaded offline cached image to server: ${data.imageUrl}`);
+            item.imageUrl = data.imageUrl;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Database] Failed to upload local image during sync:', err);
+    }
+  }
+  return item;
+}
+
 class StashDatabase {
   private items: StashItem[] = [];
   private categories: string[] = [];
@@ -231,11 +259,25 @@ class StashDatabase {
 
           // 5. Upload local-only items back to server
           for (const item of localOnlyItems) {
-            fetch(`${apiUrl}/api/items`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
-            }).catch(err => console.warn('[Database] Failed to restore item to server:', err));
+            uploadLocalImageIfNecessary(item, apiUrl).then(async (updatedItem) => {
+              if (updatedItem.imageUrl !== item.imageUrl) {
+                const idx = this.items.findIndex(i => i.id === item.id);
+                if (idx !== -1) {
+                  this.items[idx].imageUrl = updatedItem.imageUrl;
+                  await this.save();
+                  this.notify();
+                }
+              }
+              const safePayload = {
+                ...updatedItem,
+                imageUrl: updatedItem.imageUrl?.startsWith('file://') ? '' : updatedItem.imageUrl
+              };
+              fetch(`${apiUrl}/api/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(safePayload)
+              }).catch(err => console.warn('[Database] Failed to restore item to server:', err));
+            });
           }
 
           console.log('[Database] Mobile sync completed. Local-first merge-sync finished.');
@@ -331,11 +373,32 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    resolveApiUrl().then(apiUrl => {
+    resolveApiUrl().then(async (apiUrl) => {
+      let itemToSync = { ...newItem };
+      try {
+        const uploaded = await uploadLocalImageIfNecessary(itemToSync, apiUrl);
+        if (uploaded.imageUrl !== newItem.imageUrl) {
+          const idx = this.items.findIndex(i => i.id === newItem.id);
+          if (idx !== -1) {
+            this.items[idx].imageUrl = uploaded.imageUrl;
+            await this.save();
+            this.notify();
+          }
+          itemToSync = uploaded;
+        }
+      } catch (err) {
+        console.warn('[Database] Proactive image upload failed on addPending:', err);
+      }
+
+      const safePayload = {
+        ...itemToSync,
+        imageUrl: itemToSync.imageUrl?.startsWith('file://') ? '' : itemToSync.imageUrl
+      };
+
       fetch(`${apiUrl}/api/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem)
+        body: JSON.stringify(safePayload)
       }).catch(err => console.warn('[Database] Background sync failed for addPending:', err));
     });
 
@@ -361,10 +424,14 @@ class StashDatabase {
     // Sync to backend asynchronously
     const updatedBody = this.items[index];
     resolveApiUrl().then(apiUrl => {
+      const safePayload = {
+        ...updatedBody,
+        imageUrl: updatedBody.imageUrl?.startsWith('file://') ? '' : updatedBody.imageUrl
+      };
       fetch(`${apiUrl}/api/items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedBody)
+        body: JSON.stringify(safePayload)
       }).catch(err => console.warn('[Database] Background sync failed for markProcessed:', err));
     });
 
@@ -408,10 +475,14 @@ class StashDatabase {
       // Sync to backend asynchronously
       const itemToUpdate = this.items[idx];
       resolveApiUrl().then(apiUrl => {
+        const safePayload = {
+          ...itemToUpdate,
+          imageUrl: itemToUpdate.imageUrl?.startsWith('file://') ? '' : itemToUpdate.imageUrl
+        };
         fetch(`${apiUrl}/api/items/${result.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(itemToUpdate)
+          body: JSON.stringify(safePayload)
         }).catch(err => console.warn('[Database] Background sync failed for processBatch item:', err));
       });
     }
@@ -463,11 +534,32 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend asynchronously
-    resolveApiUrl().then(apiUrl => {
+    resolveApiUrl().then(async (apiUrl) => {
+      let itemToSync = { ...newItem };
+      try {
+        const uploaded = await uploadLocalImageIfNecessary(itemToSync, apiUrl);
+        if (uploaded.imageUrl !== newItem.imageUrl) {
+          const idx = this.items.findIndex(i => i.id === newItem.id);
+          if (idx !== -1) {
+            this.items[idx].imageUrl = uploaded.imageUrl;
+            await this.save();
+            this.notify();
+          }
+          itemToSync = uploaded;
+        }
+      } catch (err) {
+        console.warn('[Database] Proactive image upload failed on add:', err);
+      }
+
+      const safePayload = {
+        ...itemToSync,
+        imageUrl: itemToSync.imageUrl?.startsWith('file://') ? '' : itemToSync.imageUrl
+      };
+
       fetch(`${apiUrl}/api/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newItem)
+        body: JSON.stringify(safePayload)
       }).catch(err => console.warn('[Database] Background sync failed for add:', err));
     });
 
@@ -489,11 +581,44 @@ class StashDatabase {
 
     // Sync to backend asynchronously
     const updatedBody = this.items[index];
-    resolveApiUrl().then(apiUrl => {
+    resolveApiUrl().then(async (apiUrl) => {
+      let itemToSync = { ...updatedBody };
+      if (itemToSync.type === 'image' && itemToSync.imageUrl && itemToSync.imageUrl.startsWith('file://')) {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(itemToSync.imageUrl, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          if (base64) {
+            const uploadRes = await fetch(`${apiUrl}/api/upload`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ base64, mimeType: 'image/png' })
+            });
+            if (uploadRes.ok) {
+              const uploadData = await uploadRes.json();
+              if (uploadData && uploadData.imageUrl) {
+                console.log(`[Database] Uploaded local image to server on update: ${uploadData.imageUrl}`);
+                itemToSync.imageUrl = uploadData.imageUrl;
+                this.items[index].imageUrl = uploadData.imageUrl;
+                await this.save();
+                this.notify();
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Database] Failed to upload local image on update sync:', err);
+        }
+      }
+
+      const safePayload = {
+        ...itemToSync,
+        imageUrl: itemToSync.imageUrl?.startsWith('file://') ? '' : itemToSync.imageUrl
+      };
+
       fetch(`${apiUrl}/api/items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedBody)
+        body: JSON.stringify(safePayload)
       }).catch(err => console.warn('[Database] Background sync failed for update:', err));
     });
 

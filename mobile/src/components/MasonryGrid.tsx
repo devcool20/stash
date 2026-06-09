@@ -30,6 +30,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { StashItem, CategoryKey } from '../types';
 import { colors, fonts } from '../theme/colors';
+import { resolveImageUri } from '../processing';
 
 interface MasonryGridProps {
   items: StashItem[];
@@ -142,7 +143,7 @@ function GridCard({
             {item.imageUrl ? (
               <View style={styles.imgWrap}>
                 <ExpoImage
-                  source={{ uri: item.imageUrl }}
+                  source={{ uri: resolveImageUri(item.imageUrl) }}
                   style={styles.img}
                   contentFit="cover"
                   transition={250}

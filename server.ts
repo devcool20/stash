@@ -129,10 +129,11 @@ function decodeHtmlEntities(str: string): string {
 
 async function searchWeb(query: string): Promise<string> {
   try {
-    const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+    const res = await fetchWithTimeout(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'
-      }
+      },
+      timeout: 5000
     });
     if (!res.ok) return '';
     const html = await res.text();
@@ -150,6 +151,23 @@ async function searchWeb(query: string): Promise<string> {
   }
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }): Promise<Response> {
+  const { timeout = 8000, ...rest } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, {
+      ...rest,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
 async function callGeminiApi(prompt: string, base64Data: string, mimeType: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -159,7 +177,7 @@ async function callGeminiApi(prompt: string, base64Data: string, mimeType: strin
   const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -181,7 +199,8 @@ async function callGeminiApi(prompt: string, base64Data: string, mimeType: strin
       generationConfig: {
         responseMimeType: 'application/json'
       }
-    })
+    }),
+    timeout: 10000
   });
 
   if (!response.ok) {
@@ -349,7 +368,7 @@ Return ONLY valid JSON.`;
             },
             {
               type: 'text',
-              text: `Classify the main subject of this image AND generate a web search query.
+              text: `Classify the main subject of this image AND generate a web search query in JSON format.
 
 1. "type": one of "person", "product", "location", "text_content", "other"
    - "person" = human face, portrait, celebrity, selfie
@@ -361,25 +380,27 @@ Return ONLY valid JSON.`;
    - For products: include brand and model (e.g. "Nike Air Force 1", "iPhone 15 Pro")
    - For locations: include place name (e.g. "Eiffel Tower Paris")
    - For text/articles: extract the main heading or title
-   - For people: just output "person" (do NOT try to guess their name)
+   - For people: if they are a celebrity, public figure, actor, or well-known person, you MUST output their name as the query (e.g. "Shah Rukh Khan", "Rohit Shetty", "Mammootty"). If they are a regular person, a selfie, a mirror selfie, or not famous, just output "person".
 
-Return ONLY valid JSON: {"type": "...", "query": "..."}`
+Return ONLY a valid JSON object: {"type": "...", "query": "..."}`
             }
           ]
         }
       ],
+      response_format: { type: "json_object" },
       max_tokens: 80,
       temperature: 0.1
     };
 
     console.log('[/api/ocr] Running Step 1: Subject Classification + Query Generation...');
-    const queryApiRes = await fetch(GROQ_API_URL, {
+    const queryApiRes = await fetchWithTimeout(GROQ_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(classifyRequestBody)
+      body: JSON.stringify(classifyRequestBody),
+      timeout: 6000
     });
 
     if (queryApiRes.ok) {
@@ -402,14 +423,13 @@ Return ONLY valid JSON: {"type": "...", "query": "..."}`
       const visualQuery = parsedQueryObj.query || '';
       console.log(`[/api/ocr] Detected subject type: "${subjectType}"`);
 
-      // Only do web search for non-person subjects (products, locations, text)
-      // For people, web search HURTS because wrong name guesses poison the results
-      if (subjectType !== 'person' && visualQuery && visualQuery !== 'person') {
+      // Only do web search for non-person subjects or recognized celebrities
+      if (visualQuery && visualQuery !== 'person') {
         console.log(`[/api/ocr] Step 2: Searching DuckDuckGo for: "${visualQuery}"`);
         searchResults = await searchWeb(visualQuery);
         console.log('[/api/ocr] Search Results Retrieved:\n', searchResults);
       } else {
-        console.log('[/api/ocr] Step 2: SKIPPED web search (subject is a person — direct analysis is more accurate)');
+        console.log('[/api/ocr] Step 2: SKIPPED web search (generic person or no query)');
       }
     }
   } catch (err) {
@@ -521,18 +541,20 @@ Return ONLY valid JSON.`;
           ]
         }
       ],
+      response_format: { type: "json_object" },
       max_tokens: 1000,
       temperature: 0.1
     };
 
     console.log('[/api/ocr] Dispatching fetch request to Groq API completions endpoint...');
-    const apiRes = await fetch(GROQ_API_URL, {
+    const apiRes = await fetchWithTimeout(GROQ_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      timeout: 12000
     });
 
     if (!apiRes.ok) {
@@ -588,6 +610,28 @@ Return ONLY valid JSON.`;
     return res.status(502).json({
       error: 'Cloud vision model failed processing. Try again later.'
     });
+  }
+});
+
+app.post('/api/upload', (req, res) => {
+  const { base64, mimeType } = req.body;
+  if (!base64) {
+    return res.status(400).json({ error: 'Missing base64 data' });
+  }
+  try {
+    const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+    const filename = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, rawBase64, 'base64');
+    
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const hostedImageUrl = `${protocol}://${host}/uploads/${filename}`;
+    console.log(`[/api/upload] Saved uploaded image locally. Public hosted URL: ${hostedImageUrl}`);
+    res.json({ imageUrl: hostedImageUrl });
+  } catch (err) {
+    console.error('[/api/upload] Failed to save uploaded image:', err);
+    res.status(500).json({ error: 'Failed to upload image' });
   }
 });
 

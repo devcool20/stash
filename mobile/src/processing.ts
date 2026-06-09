@@ -14,6 +14,20 @@ interface ProcessedResult {
 
 let cachedApiUrl: string | null = null;
 
+export function resolveImageUri(uri: string | undefined): string {
+  if (!uri) return '';
+  if (uri.startsWith('file://')) {
+    return uri;
+  }
+  if (uri.startsWith('http') && cachedApiUrl) {
+    const uploadsIndex = uri.indexOf('/uploads/');
+    if (uploadsIndex !== -1) {
+      return cachedApiUrl + uri.substring(uploadsIndex);
+    }
+  }
+  return uri;
+}
+
 export const resolveApiUrl = async (): Promise<string> => {
   if (cachedApiUrl) return cachedApiUrl;
 
@@ -39,8 +53,8 @@ export const resolveApiUrl = async (): Promise<string> => {
   for (const url of candidates) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1200); // 1.2s probe timeout
-      const res = await fetch(`${url}/api/metadata?url=localhost`, {
+      const timeout = setTimeout(() => controller.abort(), 2000); // 2.0s probe timeout
+      const res = await fetch(`${url}/api/items`, {
         signal: controller.signal,
       });
       clearTimeout(timeout);
