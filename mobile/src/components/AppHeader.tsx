@@ -64,13 +64,21 @@ export function AppHeader({}: AppHeaderProps) {
     );
   }, []);
 
-  const animatedProps1 = useAnimatedProps(() => ({
-    transform: `translate(${translateX1.value}, ${translateY1.value})`,
-  }));
+  const animatedProps1 = useAnimatedProps(() => {
+    const x = translateX1.value;
+    const y = translateY1.value + 14;
+    const yControl = translateY1.value + 9;
+    const path = `M ${x} ${y} Q ${x + 25} ${yControl}, ${x + 50} ${y} T ${x + 100} ${y} T ${x + 150} ${y} T ${x + 200} ${y} T ${x + 250} ${y} T ${x + 300} ${y} L ${x + 300} 40 L ${x} 40 Z`;
+    return { d: path };
+  });
 
-  const animatedProps2 = useAnimatedProps(() => ({
-    transform: `translate(${translateX2.value - 100}, ${translateY2.value})`,
-  }));
+  const animatedProps2 = useAnimatedProps(() => {
+    const x = translateX2.value - 100;
+    const y = translateY2.value + 16;
+    const yControl = translateY2.value + 21;
+    const path = `M ${x} ${y} Q ${x + 25} ${yControl}, ${x + 50} ${y} T ${x + 100} ${y} T ${x + 150} ${y} T ${x + 200} ${y} T ${x + 250} ${y} T ${x + 300} ${y} L ${x + 300} 40 L ${x} 40 Z`;
+    return { d: path };
+  });
 
   return (
     <View style={styles.container}>
@@ -117,7 +125,6 @@ export function AppHeader({}: AppHeaderProps) {
           {/* Wave 1 (Back Wave) */}
           <AnimatedPath
             animatedProps={animatedProps1}
-            d="M 0 14 Q 25 9, 50 14 T 100 14 T 150 14 T 200 14 T 250 14 T 300 14 L 300 40 L 0 40 Z"
             fill="url(#grad1)"
             opacity={0.6}
             clipPath="url(#text-clip)"
@@ -126,7 +133,6 @@ export function AppHeader({}: AppHeaderProps) {
           {/* Wave 2 (Front Wave) */}
           <AnimatedPath
             animatedProps={animatedProps2}
-            d="M 0 16 Q 25 21, 50 16 T 100 16 T 150 16 T 200 16 T 250 16 T 300 16 L 300 40 L 0 40 Z"
             fill="url(#grad2)"
             opacity={0.85}
             clipPath="url(#text-clip)"
