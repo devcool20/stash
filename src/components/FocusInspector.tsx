@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Copy, ExternalLink, Trash2, FolderSync, Share2, ZoomIn, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { X, Copy, ExternalLink, Trash2, FolderSync, Share2, ZoomIn, ChevronUp, ChevronDown, Check, Pencil } from 'lucide-react';
 import { StashItem } from '../types';
 
 interface FocusInspectorProps {
@@ -8,13 +8,27 @@ interface FocusInspectorProps {
   onClose: () => void;
   onDelete: (id: string) => void;
   onRegroup: (id: string, newCategory: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design') => void;
+  onUpdate: (id: string, updates: Partial<StashItem>) => void;
 }
 
-export default function FocusInspector({ item, onClose, onDelete, onRegroup }: FocusInspectorProps) {
+export default function FocusInspector({ item, onClose, onDelete, onRegroup, onUpdate }: FocusInspectorProps) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showRegroupMenu, setShowRegroupMenu] = useState(false);
+
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [editDescVal, setEditDescVal] = useState(item?.description || '');
+  const [isEditingOcr, setIsEditingOcr] = useState(false);
+  const [editOcrVal, setEditOcrVal] = useState(item?.extractedText || '');
+
+  // Sync edits when item changes
+  useEffect(() => {
+    setEditDescVal(item?.description || '');
+    setIsEditingDesc(false);
+    setEditOcrVal(item?.extractedText || '');
+    setIsEditingOcr(false);
+  }, [item?.id, item?.description, item?.extractedText]);
 
   if (!item) return null;
 
@@ -119,14 +133,53 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
           </div>
 
           {/* Description Section */}
-          {item.description && (
-            <div className="space-y-1.5">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">ABOUT THIS IMAGE</span>
-              <div className="glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 text-xs text-white leading-relaxed">
-                {item.description}
-              </div>
+              {!isEditingDesc && (
+                <button
+                  onClick={() => setIsEditingDesc(true)}
+                  className="p-1 rounded bg-white/5 border border-white/5 text-[#8A8A93] hover:text-white hover:bg-white/10 transition-colors cursor-pointer outline-none"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
             </div>
-          )}
+            {isEditingDesc ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editDescVal}
+                  onChange={(e) => setEditDescVal(e.target.value)}
+                  placeholder="Add description..."
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl p-3 text-xs text-white placeholder-gray-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all font-sans resize-none h-24"
+                />
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => {
+                      setIsEditingDesc(false);
+                      setEditDescVal(item.description || '');
+                    }}
+                    className="px-3 py-1.5 rounded-full border border-white/10 bg-transparent text-[#8A8A93] hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold uppercase tracking-wider cursor-pointer outline-none"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      onUpdate(item.id, { description: editDescVal });
+                      setIsEditingDesc(false);
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-white text-black hover:bg-gray-200 transition-all text-[10px] font-bold uppercase tracking-wider cursor-pointer outline-none"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={`glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 text-xs leading-relaxed ${!item.description ? 'text-[#8A8A93]/65 italic' : 'text-white'}`}>
+                {item.description || 'No description. Tap edit icon to add details.'}
+              </div>
+            )}
+          </div>
 
           {/* Source Link indicator */}
           {item.sourceUrl && (
@@ -157,14 +210,24 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
 
           {/* Extracted Text (OCR / OCR Mono Block) Accordion */}
           <div className="space-y-2">
-            <button
-              onClick={() => setIsOcrOpen(!isOcrOpen)}
-              id="toggle-ocr-accordion"
-              className="w-full flex items-center justify-between py-2 border-b border-white/5 cursor-pointer outline-none"
-            >
-              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">SCANNED TEXT IN IMAGE</span>
-              {isOcrOpen ? <ChevronUp className="w-4 h-4 text-[#8A8A93]" /> : <ChevronDown className="w-4 h-4 text-[#8A8A93]" />}
-            </button>
+            <div className="flex items-center justify-between border-b border-white/5 py-1">
+              <button
+                onClick={() => setIsOcrOpen(!isOcrOpen)}
+                id="toggle-ocr-accordion"
+                className="flex-1 flex items-center justify-between py-1 cursor-pointer outline-none"
+              >
+                <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">SCANNED TEXT IN IMAGE</span>
+                {isOcrOpen ? <ChevronUp className="w-4 h-4 text-[#8A8A93] mr-2" /> : <ChevronDown className="w-4 h-4 text-[#8A8A93] mr-2" />}
+              </button>
+              {isOcrOpen && !isEditingOcr && (
+                <button
+                  onClick={() => setIsEditingOcr(true)}
+                  className="p-1 rounded bg-white/5 border border-white/5 text-[#8A8A93] hover:text-white hover:bg-white/10 transition-colors cursor-pointer outline-none"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
+            </div>
 
             <AnimatePresence>
               {isOcrOpen && (
@@ -174,20 +237,53 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div id="ocr-monospace" className="glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 relative space-y-4">
-                    <p className="font-mono text-xs text-white leading-relaxed tracking-wide select-text whitespace-pre-wrap max-h-48 overflow-y-auto pr-1">
-                      {item.extractedText || 'No text scanned in this image.'}
-                    </p>
+                  {isEditingOcr ? (
+                    <div className="space-y-2 pt-1">
+                      <textarea
+                        value={editOcrVal}
+                        onChange={(e) => setEditOcrVal(e.target.value)}
+                        placeholder="Add scanned text..."
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl p-3 text-xs text-white placeholder-gray-650 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all font-mono resize-none h-32"
+                      />
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => {
+                            setIsEditingOcr(false);
+                            setEditOcrVal(item.extractedText || '');
+                          }}
+                          className="px-3 py-1.5 rounded-full border border-white/10 bg-transparent text-[#8A8A93] hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold uppercase tracking-wider cursor-pointer outline-none"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            onUpdate(item.id, { extractedText: editOcrVal });
+                            setIsEditingOcr(false);
+                          }}
+                          className="px-3 py-1.5 rounded-full bg-white text-black hover:bg-gray-200 transition-all text-[10px] font-bold uppercase tracking-wider cursor-pointer outline-none"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div id="ocr-monospace" className="glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 relative space-y-4">
+                      <p className={`font-mono text-xs leading-relaxed tracking-wide select-text whitespace-pre-wrap max-h-48 overflow-y-auto pr-1 ${!item.extractedText ? 'text-[#8A8A93]/65 italic' : 'text-white'}`}>
+                        {item.extractedText || 'No text scanned in this image. Tap edit icon to add text.'}
+                      </p>
 
-                    <button
-                      onClick={handleCopy}
-                      id="ocr-copy-all"
-                      className="inline-flex items-center space-x-1.5 py-1 px-3 mt-1.5 bg-white text-black font-semibold rounded-full hover:bg-gray-200 outline-none active:scale-95 transition-all cursor-pointer font-display text-[10px] select-none"
-                    >
-                      {copied ? <Check className="w-3 h-3 text-black" /> : <Copy className="w-3 h-3" />}
-                      <span>{copied ? 'COPIED TO CLIPBOARD' : 'COPY ALL'}</span>
-                    </button>
-                  </div>
+                      {item.extractedText ? (
+                        <button
+                          onClick={handleCopy}
+                          id="ocr-copy-all"
+                          className="inline-flex items-center space-x-1.5 py-1 px-3 mt-1.5 bg-white text-black font-semibold rounded-full hover:bg-gray-200 outline-none active:scale-95 transition-all cursor-pointer font-display text-[10px] select-none"
+                        >
+                          {copied ? <Check className="w-3 h-3 text-black" /> : <Copy className="w-3 h-3" />}
+                          <span>{copied ? 'COPIED TO CLIPBOARD' : 'COPY ALL'}</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

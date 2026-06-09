@@ -11,6 +11,7 @@ import {
   Share,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import Animated, {
   SlideInDown,
@@ -33,6 +34,7 @@ import {
   ZoomOut,
   ChevronUp,
   ChevronDown,
+  Pencil,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
@@ -45,6 +47,7 @@ interface FocusInspectorProps {
   onClose: () => void;
   onDelete: (id: string) => void;
   onRegroup: (id: string, newCategory: CategoryKey) => void;
+  onUpdate: (id: string, updates: Partial<StashItem>) => void;
 }
 
 const CATEGORIES: CategoryKey[] = [
@@ -61,6 +64,7 @@ export function FocusInspector({
   onClose,
   onDelete,
   onRegroup,
+  onUpdate,
 }: FocusInspectorProps) {
   const [isZoomed, setIsZoomed] = useState(false);
   const zoomScale = useSharedValue(1);
@@ -78,6 +82,18 @@ export function FocusInspector({
   const [isOcrOpen, setIsOcrOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showRegroupMenu, setShowRegroupMenu] = useState(false);
+
+  const [isEditingDesc, setIsEditingDesc] = useState(false);
+  const [editDescVal, setEditDescVal] = useState(item?.description || '');
+  const [isEditingOcr, setIsEditingOcr] = useState(false);
+  const [editOcrVal, setEditOcrVal] = useState(item?.extractedText || '');
+
+  useEffect(() => {
+    setEditDescVal(item?.description || '');
+    setIsEditingDesc(false);
+    setEditOcrVal(item?.extractedText || '');
+    setIsEditingOcr(false);
+  }, [item?.id, item?.description, item?.extractedText]);
 
   if (!item) return null;
 
@@ -200,18 +216,68 @@ export function FocusInspector({
               </View>
 
               {/* Description Section */}
-              {item.description && (
-                <View style={{ gap: 6, marginTop: 18 }}>
+              <View style={{ gap: 6, marginTop: 18 }}>
+                <View style={styles.labelRow}>
                   <Text style={styles.label}>
                     ABOUT THIS IMAGE
                   </Text>
+                  {!isEditingDesc && (
+                    <Pressable
+                      onPress={() => setIsEditingDesc(true)}
+                      style={({ pressed }) => [
+                        styles.editIconBtn,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Pencil color={colors.textSecondary} size={11} strokeWidth={2} />
+                    </Pressable>
+                  )}
+                </View>
+                {isEditingDesc ? (
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.descInput}
+                      multiline
+                      value={editDescVal}
+                      onChangeText={setEditDescVal}
+                      placeholder="Add description..."
+                      placeholderTextColor="#4E4E54"
+                    />
+                    <View style={styles.editActions}>
+                      <Pressable
+                        onPress={() => {
+                          setIsEditingDesc(false);
+                          setEditDescVal(item.description || '');
+                        }}
+                        style={({ pressed }) => [
+                          styles.cancelBtn,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <Text style={styles.cancelBtnText}>CANCEL</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          onUpdate(item.id, { description: editDescVal });
+                          setIsEditingDesc(false);
+                        }}
+                        style={({ pressed }) => [
+                          styles.saveBtn,
+                          pressed && { opacity: 0.75 },
+                        ]}
+                      >
+                        <Text style={styles.saveBtnText}>SAVE</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : (
                   <View style={styles.descPanel}>
-                    <Text style={styles.descText}>
-                      {item.description}
+                    <Text style={[styles.descText, !item.description && styles.placeholderText]}>
+                      {item.description || 'No description. Tap edit icon to add details.'}
                     </Text>
                   </View>
-                </View>
-              )}
+                )}
+              </View>
 
               {/* Source URL pill */}
               {item.sourceUrl && (
@@ -261,70 +327,124 @@ export function FocusInspector({
 
               {/* OCR Accordion */}
               <View style={{ gap: 8, marginTop: 18 }}>
-                <Pressable
-                  onPress={() => setIsOcrOpen(!isOcrOpen)}
-                  style={styles.accordionHead}
-                >
-                  <Text style={styles.label}>
-                    SCANNED TEXT IN IMAGE
-                  </Text>
-                  {isOcrOpen ? (
-                    <ChevronUp
-                      color={colors.textSecondary}
-                      size={14}
-                      strokeWidth={2}
-                    />
-                  ) : (
-                    <ChevronDown
-                      color={colors.textSecondary}
-                      size={14}
-                      strokeWidth={2}
-                    />
+                <View style={styles.accordionHeadRow}>
+                  <Pressable
+                    onPress={() => setIsOcrOpen(!isOcrOpen)}
+                    style={styles.accordionHeadLeft}
+                  >
+                    <Text style={styles.label}>
+                      SCANNED TEXT IN IMAGE
+                    </Text>
+                    {isOcrOpen ? (
+                      <ChevronUp
+                        color={colors.textSecondary}
+                        size={14}
+                        strokeWidth={2}
+                      />
+                    ) : (
+                      <ChevronDown
+                        color={colors.textSecondary}
+                        size={14}
+                        strokeWidth={2}
+                      />
+                    )}
+                  </Pressable>
+                  {isOcrOpen && !isEditingOcr && (
+                    <Pressable
+                      onPress={() => setIsEditingOcr(true)}
+                      style={({ pressed }) => [
+                        styles.editIconBtn,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Pencil color={colors.textSecondary} size={11} strokeWidth={2} />
+                    </Pressable>
                   )}
-                </Pressable>
+                </View>
 
                 {isOcrOpen && (
                   <Animated.View
                     entering={FadeIn.duration(250).springify()}
                     exiting={FadeOut.duration(120)}
                   >
-                    <View style={styles.ocrPanel}>
-                      <ScrollView
-                        style={{ maxHeight: 160 }}
-                        showsVerticalScrollIndicator
-                      >
-                        <Text style={styles.ocrText} selectable>
-                          {item.extractedText ||
-                            'No text scanned in this image.'}
-                        </Text>
-                      </ScrollView>
-                      <View style={styles.copyRow}>
-                        <Pressable
-                          onPress={handleCopy}
-                          style={({ pressed }) => [
-                            styles.copyBtn,
-                            pressed && { transform: [{ scale: 0.96 }] },
-                          ]}
-                        >
-                          {copied ? (
-                            <Check
-                              color="#FFFFFF"
-                              size={11}
-                              strokeWidth={2.4}
-                            />
-                          ) : (
-                            <Copy
-                              color="#FFFFFF"
-                              size={11}
-                              strokeWidth={2.4}
-                            />
-                          )}
-                          <Text style={styles.copyText}>
-                            {copied ? 'COPIED' : 'COPY ALL'}
-                          </Text>
-                        </Pressable>
+                    {isEditingOcr ? (
+                      <View style={styles.inputContainer}>
+                        <TextInput
+                          style={styles.ocrInput}
+                          multiline
+                          value={editOcrVal}
+                          onChangeText={setEditOcrVal}
+                          placeholder="Add scanned text..."
+                          placeholderTextColor="#4E4E54"
+                        />
+                        <View style={styles.editActions}>
+                          <Pressable
+                            onPress={() => {
+                              setIsEditingOcr(false);
+                              setEditOcrVal(item.extractedText || '');
+                            }}
+                            style={({ pressed }) => [
+                              styles.cancelBtn,
+                              pressed && { opacity: 0.7 },
+                            ]}
+                          >
+                            <Text style={styles.cancelBtnText}>CANCEL</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              onUpdate(item.id, { extractedText: editOcrVal });
+                              setIsEditingOcr(false);
+                            }}
+                            style={({ pressed }) => [
+                              styles.saveBtn,
+                              pressed && { opacity: 0.75 },
+                            ]}
+                          >
+                            <Text style={styles.saveBtnText}>SAVE</Text>
+                          </Pressable>
+                        </View>
                       </View>
-                    </View>
+                    ) : (
+                      <View style={styles.ocrPanel}>
+                        <ScrollView
+                          style={{ maxHeight: 160 }}
+                          showsVerticalScrollIndicator
+                        >
+                          <Text style={[styles.ocrText, !item.extractedText && styles.placeholderText]} selectable>
+                            {item.extractedText ||
+                              'No text scanned in this image. Tap edit icon to add text.'}
+                          </Text>
+                        </ScrollView>
+                        {item.extractedText ? (
+                          <View style={styles.copyRow}>
+                            <Pressable
+                              onPress={handleCopy}
+                              style={({ pressed }) => [
+                                styles.copyBtn,
+                                pressed && { transform: [{ scale: 0.96 }] },
+                              ]}
+                            >
+                              {copied ? (
+                                <Check
+                                  color="#FFFFFF"
+                                  size={11}
+                                  strokeWidth={2.4}
+                                />
+                              ) : (
+                                <Copy
+                                  color="#FFFFFF"
+                                  size={11}
+                                  strokeWidth={2.4}
+                                />
+                              )}
+                              <Text style={styles.copyText}>
+                                {copied ? 'COPIED' : 'COPY ALL'}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
                   </Animated.View>
                 )}
               </View>
@@ -754,5 +874,104 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontWeight: '500',
     letterSpacing: 0.3,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editIconBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  inputContainer: {
+    gap: 8,
+    width: '100%',
+  },
+  descInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 16,
+    padding: 12,
+    color: colors.textPrimary,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  ocrInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 16,
+    padding: 12,
+    color: colors.textPrimary,
+    fontFamily: fonts.mono,
+    fontSize: 10.5,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  editActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 2,
+  },
+  saveBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveBtnText: {
+    color: '#000000',
+    fontSize: 9.5,
+    fontWeight: '700',
+    fontFamily: fonts.body,
+    letterSpacing: 0.8,
+  },
+  cancelBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    color: colors.textPrimary,
+    fontSize: 9.5,
+    fontWeight: '500',
+    fontFamily: fonts.body,
+    letterSpacing: 0.8,
+  },
+  placeholderText: {
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  accordionHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+  },
+  accordionHeadLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
   },
 });

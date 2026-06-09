@@ -3,7 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import fs from 'fs';
-import { GoogleGenAI } from '@google/genai';
+
 
 dotenv.config();
 
@@ -28,9 +28,7 @@ if (hasApiKey) {
   console.warn('GROQ_API_KEY not set. OCR will return mock responses.');
 }
 
-let ai: GoogleGenAI | null = null;
 if (process.env.GEMINI_API_KEY) {
-  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   console.log('Gemini API key found — celebrity identification via Gemini enabled.');
 } else {
   console.warn('GEMINI_API_KEY not set. Gemini integration disabled.');
@@ -152,6 +150,54 @@ async function searchWeb(query: string): Promise<string> {
   }
 }
 
+async function callGeminiApi(prompt: string, base64Data: string, mimeType: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set.');
+  }
+
+  const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: mimeType || 'image/png',
+                data: cleanBase64
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json'
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API returned status ${response.status}: ${errorText}`);
+  }
+
+  const result = await response.json();
+  const contentText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!contentText) {
+    throw new Error(`Empty content returned from Gemini REST API.`);
+  }
+
+  return contentText;
+}
+
 // 2. API Endpoint: Vision OCR & Image Analysis
 // Uses Groq's Llama 4 Scout Vision API to extract OCR text,
 // generate a one-line visual summary for search, and classify content.
@@ -230,44 +276,23 @@ app.post('/api/ocr', async (req, res) => {
   const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
   // Fast single-pass pipeline using Gemini 2.0 Flash if available
-  if (process.env.GEMINI_API_KEY && ai) {
+  if (process.env.GEMINI_API_KEY) {
     console.log('[/api/ocr] Gemini API key found. Running fast, single-pass gemini-2.0-flash pipeline...');
     try {
-      const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
       const geminiPrompt = `Analyze this image in detail. Identify any prominent subjects, including specific products (brand/model), locations (landmarks), text content, or people (especially celebrities/public figures like Shah Rukh Khan, Rohit Shetty, etc. if recognizable).
+If the image is a selfie, mirror selfie, or shows a non-celebrity person, focus the analysis on identifying key objects visible in the image such as the phone (brand/model if possible), mirrors, shoes, t-shirts/clothing, bags, accessories, or other objects, rather than returning generic descriptions of the person. Include these objects in the description, title, and tags.
 
 Return a JSON object with these fields:
 - "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
-- "title": a short descriptive title (max 6 words). Use exact names/versions/brands/celebrities if recognizable.
+- "title": a short descriptive title (max 6 words). Use exact names/versions/brands/celebrities if recognizable. Otherwise, use key objects/setting (e.g., "Mirror Selfie with Phone").
 - "summary": ONE short sentence describing what this image visually shows.
-- "description": a detailed 3-4 sentence description of what is pictured. Include exact names, model numbers, locations, or celebrity identities if recognizable.
+- "description": a detailed 3-4 sentence description of what is pictured. Include exact names, model numbers, locations, or celebrity identities if recognizable. For selfies/mirror selfies, describe their outfit, setting, and key objects they have (phone, bag, shoes, etc.).
 - "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
-- "tags": 3-5 single-word tags describing the image content.
+- "tags": 3-5 single-word tags describing the image content. Include key objects if appropriate (e.g., "phone", "mirror", "shoes", "outfit", "tshirt").
 
 Return ONLY valid JSON.`;
 
-      const geminiResponse = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: geminiPrompt },
-              {
-                inlineData: {
-                  mimeType: cleanMimeType,
-                  data: rawBase64
-                }
-              }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: 'application/json'
-        }
-      });
-
-      const rawContent = geminiResponse.text;
+      const rawContent = await callGeminiApi(geminiPrompt, base64, cleanMimeType);
       console.log('[/api/ocr] Received response from Gemini. Raw content:\n', rawContent);
 
       if (!rawContent) {
@@ -398,45 +423,28 @@ Return ONLY valid JSON: {"type": "...", "query": "..."}`
     const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
     console.log(`[/api/ocr] Image base64 payload size: ${(rawBase64.length / 1024).toFixed(1)} KB`);
 
-    if (subjectType === 'person' && process.env.GEMINI_API_KEY && ai) {
+    if (subjectType === 'person' && process.env.GEMINI_API_KEY) {
       console.log('[/api/ocr] Subject is "person" and Gemini is enabled. Using gemini-2.0-flash...');
-      const geminiPrompt = `Analyze this image in detail. Identify the main person in the image (especially if they are a celebrity or public figure like Shah Rukh Khan, Rohit Shetty, etc.). Return a JSON object with these fields:
+      try {
+        const geminiPrompt = `Analyze this image in detail. Identify the main person in the image (especially if they are a celebrity or public figure like Shah Rukh Khan, Rohit Shetty, etc.).
+If the person is not a famous or recognizable public figure (e.g., a regular person, selfie, or mirror selfie), do NOT guess their name; instead, focus the analysis and description on key objects visible in the image, such as their phone (brand/model if possible), mirrors, shoes, t-shirts/clothing, bags, accessories, or other items they are carrying or wearing.
+
+Return a JSON object with these fields:
 - "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
-- "title": a short descriptive title (max 6 words). If a specific person is identified, use their name in the title (e.g. "Shah Rukh Khan", "Rohit Shetty").
+- "title": a short descriptive title (max 6 words). If a specific person is identified, use their name. If not, use key objects or setting (e.g., "Mirror Selfie with Phone").
 - "summary": ONE short sentence describing what this image visually shows.
-- "description": a detailed 3-4 sentence description of what is pictured. Identify the person by name, describe their appearance, clothing, setting, and any other recognizable features or actions.
+- "description": a detailed 3-4 sentence description of what is pictured. Identify the person by name if celebrity, otherwise describe their outfit, setting, and key objects they have (phone, bag, shoes, etc.).
 - "category": Always classify as "People".
-- "tags": 3-5 single-word tags describing the image content.
+- "tags": 3-5 single-word tags describing the image content (e.g. including key objects like "phone", "mirror", "shoes", "outfit", "tshirt").
 
 Return ONLY valid JSON.`;
 
-      const geminiResponse = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: geminiPrompt },
-              {
-                inlineData: {
-                  mimeType: cleanMimeType,
-                  data: rawBase64
-                }
-              }
-            ]
-          }
-        ],
-        config: {
-          responseMimeType: 'application/json'
+        const rawContent = await callGeminiApi(geminiPrompt, base64, cleanMimeType);
+        console.log('[/api/ocr] Received response from Gemini. Raw content:\n', rawContent);
+
+        if (!rawContent) {
+          throw new Error('Empty message response from Gemini.');
         }
-      });
-
-      const rawContent = geminiResponse.text;
-      console.log('[/api/ocr] Received response from Gemini. Raw content:\n', rawContent);
-
-      if (!rawContent) {
-        throw new Error('Empty message response from Gemini.');
-      }
 
       const jsonText = rawContent.trim();
       let parsed;
@@ -455,16 +463,20 @@ Return ONLY valid JSON.`;
         throw parseErr;
       }
 
-      console.log('[/api/ocr] Successfully parsed JSON result from Gemini. Title:', parsed.title);
-      return res.json({
-        text: parsed.text || '',
-        title: parsed.title || 'Analyzed Image',
-        summary: parsed.summary || '',
-        description: parsed.description || 'Extracted from image.',
-        category: parsed.category || 'People',
-        tags: parsed.tags || [],
-        imageUrl: hostedImageUrl
-      });
+        console.log('[/api/ocr] Successfully parsed JSON result from Gemini. Title:', parsed.title);
+        return res.json({
+          text: parsed.text || '',
+          title: parsed.title || 'Analyzed Image',
+          summary: parsed.summary || '',
+          description: parsed.description || 'Extracted from image.',
+          category: parsed.category || 'People',
+          tags: parsed.tags || [],
+          imageUrl: hostedImageUrl
+        });
+      } catch (geminiErr: any) {
+        console.error('[/api/ocr] Direct Gemini call failed for person subject:', geminiErr?.message || geminiErr);
+        // Fall back to Groq Llama completions below (do not return, let it continue)
+      }
     }
 
     console.log('[/api/ocr] GROQ_API_KEY is active. Preparing request for meta-llama/llama-4-scout-17b-16e-instruct...');

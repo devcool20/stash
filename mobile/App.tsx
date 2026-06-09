@@ -117,6 +117,17 @@ export default function App() {
     if (updated) setFocusedItem(updated);
   };
 
+  const handleUpdateItem = async (
+    id: string,
+    updates: Partial<StashItem>,
+  ) => {
+    await db.update(id, updates);
+    refreshStorage();
+    const updated = (await db.getAll()).find((i) => i.id === id);
+    if (updated) setFocusedItem(updated);
+  };
+
+
   const handleResetDatabase = async () => {
     await db.reset();
     refreshStorage();
@@ -215,6 +226,7 @@ export default function App() {
             onClose={handleCloseInspector}
             onDelete={handleDeleteItem}
             onRegroup={handleRegroupItem}
+            onUpdate={handleUpdateItem}
           />
         </View>
       </SafeAreaProvider>

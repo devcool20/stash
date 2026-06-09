@@ -97,6 +97,18 @@ export default function App() {
     }
   };
 
+  const handleUpdateItem = (id: string, updates: Partial<StashItem>) => {
+    db.update(id, updates);
+    refreshStorage();
+    
+    // Update focused panel state live
+    const updated = db.getAll().find(i => i.id === id);
+    if (updated) {
+      setFocusedItem(updated);
+    }
+  };
+
+
   const handleResetDatabase = () => {
     if (confirm('Re-crystallize Sandbox database? This restores all default aesthetic lookbook listings.')) {
       db.reset();
@@ -335,6 +347,7 @@ export default function App() {
               onClose={() => setFocusedItem(null)} 
               onDelete={handleDeleteItem} 
               onRegroup={handleRegroupItem}
+              onUpdate={handleUpdateItem}
             />
           )}
         </AnimatePresence>
