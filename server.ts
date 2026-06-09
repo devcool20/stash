@@ -206,11 +206,11 @@ app.post('/api/ocr', async (req, res) => {
             {
               type: 'text',
               text: `Analyze this image in detail. Return a JSON object with these fields:
-- "text": any visible text extracted from the image (empty string if none).
+- "text": extract ALL visible text in the image (especially names, titles, headings, prices, specifications, and paragraph text). Do not skip any text.
 - "title": a short descriptive title (max 6 words).
 - "summary": ONE short sentence describing what this image visually shows (used for search queries).
-- "description": a 1-2 sentence detailed description of what is pictured.
-- "category": one of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom one that fits.
+- "description": a detailed 3-4 sentence description of what is pictured. If it's an object or animal (e.g. a dog), describe its breed, color, appearance, and mood/setting in a user-friendly way.
+- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design". If the image contains a human face, portrait, avatar, or people, classify it as "People". If it is another type of image that doesn't fit the main five, output a custom category (e.g. "Pets", "Fitness", "Work"). Be robust and accurate.
 - "tags": 3-5 single-word tags describing the image content.
 
 Return ONLY valid JSON.`

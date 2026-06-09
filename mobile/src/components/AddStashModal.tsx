@@ -106,14 +106,14 @@ export function AddStashModal({
       } else if (source.imageUri) {
         const result = await processImage(source.imageUri, source.title);
         finalTitle = result.title;
-        finalDesc = result.summary || result.description;
+        finalDesc = result.description || result.summary;
         finalOcr = result.extractedText;
         finalImg = result.imageUrl || source.imageUri;
         finalCategory = result.category;
       }
 
-      const category = finalCategory && ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'].includes(finalCategory)
-        ? finalCategory
+      const category = finalCategory && finalCategory.trim()
+        ? finalCategory.trim()
         : autoCategorize(finalOcr || finalDesc || '', finalTitle, finalSource);
 
       const readyItem = await db.update(tempItem.id, {

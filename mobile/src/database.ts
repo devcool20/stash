@@ -312,7 +312,9 @@ class StashDatabase {
     imageUrl?: string;
     category?: string;
   }): Promise<StashItem> {
-    await this.ready;
+    if (item.category) {
+      await this.addCategory(item.category);
+    }
     const newItem: StashItem = {
       id: `pending-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       type: item.type,
@@ -344,7 +346,9 @@ class StashDatabase {
     ocrText: string,
     category: string,
   ): Promise<StashItem | null> {
-    await this.ready;
+    if (category) {
+      await this.addCategory(category);
+    }
     const index = this.items.findIndex((i) => i.id === id);
     if (index === -1) return null;
     this.items[index].status = 'ready';
@@ -394,6 +398,9 @@ class StashDatabase {
       if (result.imageUrl) {
         this.items[idx].imageUrl = result.imageUrl;
       }
+      if (result.category) {
+        await this.addCategory(result.category);
+      }
       updated.push(this.items[idx]);
 
       // Sync to backend asynchronously
@@ -440,7 +447,9 @@ class StashDatabase {
   public async add(
     item: Omit<StashItem, 'id' | 'createdAt'>,
   ): Promise<StashItem> {
-    await this.ready;
+    if (item.category) {
+      await this.addCategory(item.category);
+    }
     const newItem: StashItem = {
       ...item,
       id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -465,7 +474,9 @@ class StashDatabase {
     id: string,
     updates: Partial<StashItem>,
   ): Promise<StashItem | null> {
-    await this.ready;
+    if (updates.category) {
+      await this.addCategory(updates.category);
+    }
     const index = this.items.findIndex((item) => item.id === id);
     if (index === -1) return null;
     this.items[index] = { ...this.items[index], ...updates };
