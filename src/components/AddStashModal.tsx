@@ -125,7 +125,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         
         finalOcr = ocrData.text || '';
         finalTitle = sourceData.title || 'Extracted Screenshot';
-        finalDesc = ocrData.summary || (finalOcr ? finalOcr.substring(0, 100) + '...' : 'Extracted screenshot visual elements');
+        finalDesc = ocrData.description || ocrData.summary || (finalOcr ? finalOcr.substring(0, 100) + '...' : 'Extracted screenshot visual elements');
         finalImg = ocrData.imageUrl || sourceData.imageBase64 || '';
       }
 

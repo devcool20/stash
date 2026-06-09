@@ -209,8 +209,8 @@ app.post('/api/ocr', async (req, res) => {
 - "text": any visible text extracted from the image (empty string if none).
 - "title": a short descriptive title (max 6 words).
 - "summary": ONE short sentence describing what this image visually shows (used for search queries).
-- "description": a 1-2 sentence detailed description of what is pictured.
-- "category": one of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom one that fits.
+- "description": a detailed 3-4 sentence description of what is pictured. If it's an object or animal (e.g. a dog), describe its breed, color, appearance, and mood/setting in a user-friendly way.
+- "category": classify this image into one of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom one (e.g. "Pets", "Fitness", "Work") if it clearly doesn't fit the main five. Be robust and accurate.
 - "tags": 3-5 single-word tags describing the image content.
 
 Return ONLY valid JSON.`

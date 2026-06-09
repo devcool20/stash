@@ -96,7 +96,7 @@ async function callOcrApi(base64: string): Promise<ProcessedResult | null> {
     console.log(`[callOcrApi] Successfully processed vision data. Title: "${data.title}", Category: "${data.category}"`);
     return {
       title: data.title || 'Extracted Screenshot',
-      description: data.summary || data.description || 'Processed via Stash OCR engine',
+      description: data.description || data.summary || 'Processed via Stash OCR engine',
       summary: data.summary || '',
       extractedText: data.text || '',
       category: data.category || 'Design',
