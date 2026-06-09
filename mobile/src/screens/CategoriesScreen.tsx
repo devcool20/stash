@@ -72,7 +72,7 @@ export function CategoriesScreen({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerIconBox}>
-            <Inbox color={colors.bg} size={14} strokeWidth={2.4} />
+            <Inbox color="#FFFFFF" size={14} strokeWidth={2.4} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Inbox</Text>
@@ -184,9 +184,9 @@ export function CategoriesScreen({
             ]}
           >
             {processing ? (
-              <Loader color={colors.bg} size={14} strokeWidth={2.4} />
+              <Loader color="#FFFFFF" size={14} strokeWidth={2.4} />
             ) : (
-              <Sparkles color={colors.bg} size={14} strokeWidth={2.4} />
+              <Sparkles color="#FFFFFF" size={14} strokeWidth={2.4} />
             )}
             <Text style={styles.processText}>
               {processing
@@ -220,7 +220,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -365,7 +367,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 999,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     gap: 8,
     shadowColor: colors.shadowMed,
     shadowOffset: { width: 0, height: 4 },
@@ -375,7 +379,7 @@ const styles = StyleSheet.create({
   },
   processText: {
     fontSize: 11,
-    color: colors.bg,
+    color: '#FFFFFF',
     fontFamily: fonts.body,
     fontWeight: '700',
     letterSpacing: 0.5,

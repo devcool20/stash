@@ -63,7 +63,7 @@ export default function BottomBar({ activeTab, setActiveTab, onAddClick }: Botto
           <button
             id="add-stash-trigger"
             onClick={onAddClick}
-            className="flex items-center justify-center p-2.5 rounded-full bg-white text-black font-semibold shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)] transition-all active:scale-90 duration-200 outline-none cursor-pointer"
+            className="flex items-center justify-center p-2.5 rounded-full bg-white/12 border border-white/20 text-white font-semibold shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-90 duration-200 outline-none cursor-pointer"
           >
             <motion.div
               whileHover={{ rotate: 90 }}

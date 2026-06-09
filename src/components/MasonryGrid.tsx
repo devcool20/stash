@@ -161,7 +161,7 @@ function GridCard({ item, index, onItemClick, getCategoryIcon, getRelativeTime }
 
       {/* Title & Metadata Strip details */}
       <div className="p-3.5 space-y-1 relative z-10">
-        <h4 id={`card-title-${item.id}`} className="font-display font-medium text-xs tracking-tight text-white leading-snug group-hover:text-emerald-300 transition-colors">
+        <h4 id={`card-title-${item.id}`} className="font-display font-medium text-xs tracking-tight text-white leading-snug group-hover:text-gray-300 transition-colors">
           {item.title}
         </h4>
         

@@ -30,11 +30,39 @@ export function BottomBar({
   onAddClick,
   pendingCount = 0,
 }: BottomBarProps) {
+  // Keep track of laid-out coordinates for each tab button
+  const [layouts, setLayouts] = React.useState<Record<string, { x: number; width: number }>>({});
+
+  const indicatorX = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+  const indicatorOpacity = useSharedValue(0);
+
+  React.useEffect(() => {
+    const layout = layouts[activeTab];
+    if (layout) {
+      // Center the 36px wide indicator over the measured tab button layout
+      const targetX = layout.x + (layout.width - 36) / 2;
+      indicatorX.value = withSpring(targetX, { damping: 22, stiffness: 180 });
+      indicatorWidth.value = withSpring(36, { damping: 22, stiffness: 180 });
+      indicatorOpacity.value = withTiming(1, { duration: 150 });
+    }
+  }, [activeTab, layouts]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    left: 0,
+    width: indicatorWidth.value,
+    transform: [{ translateX: indicatorX.value }],
+    opacity: indicatorOpacity.value,
+  }));
+
   return (
     <View pointerEvents="box-none" style={styles.container}>
       <View style={styles.barWrap}>
         <View style={styles.bar}>
           <View style={styles.inner}>
+            {/* Shared sliding active background pill */}
+            <Animated.View style={[styles.activeBg, indicatorStyle]} />
+
             {TABS.map((tab) => (
               <TabButton
                 key={tab.id}
@@ -42,6 +70,9 @@ export function BottomBar({
                 Icon={tab.icon}
                 onPress={() => setActiveTab(tab.id)}
                 badge={tab.id === 'categories' ? pendingCount : undefined}
+                onLayout={(x, width) => {
+                  setLayouts((prev) => ({ ...prev, [tab.id]: { x, width } }));
+                }}
               />
             ))}
 
@@ -60,29 +91,18 @@ function TabButton({
   Icon,
   onPress,
   badge,
+  onLayout,
 }: {
   isActive: boolean;
   Icon: any;
   onPress: () => void;
   badge?: number;
+  onLayout: (x: number, width: number) => void;
 }) {
   const scale = useSharedValue(1);
-  const activeProgress = useSharedValue(isActive ? 1 : 0);
-
-  React.useEffect(() => {
-    activeProgress.value = withTiming(isActive ? 1 : 0, { duration: 200 });
-  }, [isActive]);
 
   const pressAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-  }));
-
-  const bgAnimStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      activeProgress.value,
-      [0, 1],
-      ['transparent', colors.textPrimary],
-    ),
   }));
 
   return (
@@ -95,16 +115,15 @@ function TabButton({
         scale.value = withSpring(1, { damping: 12, stiffness: 200 });
       }}
       style={styles.tabBtn}
+      onLayout={(e) => {
+        const { x, width } = e.nativeEvent.layout;
+        onLayout(x, width);
+      }}
     >
       <Animated.View style={pressAnimStyle}>
-        <Animated.View
-          style={[
-            styles.iconWrap,
-            bgAnimStyle,
-          ]}
-        >
+        <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
           <Icon
-            color={isActive ? colors.bg : colors.textPrimary}
+            color={isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
             size={16}
             strokeWidth={isActive ? 2.4 : 2}
           />
@@ -113,7 +132,7 @@ function TabButton({
               <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
             </View>
           )}
-        </Animated.View>
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -144,7 +163,7 @@ function AddButton({ onPress }: { onPress: () => void }) {
       style={styles.addBtn}
     >
       <Animated.View style={animatedStyle}>
-        <Plus color={colors.bg} size={18} strokeWidth={2.6} />
+        <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
       </Animated.View>
     </Pressable>
   );
@@ -180,20 +199,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     width: '100%',
+    position: 'relative',
+  },
+  activeBg: {
+    position: 'absolute',
+    top: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    zIndex: 1,
   },
   tabBtn: {
     padding: 2,
+    zIndex: 2,
   },
   iconWrap: {
     width: 36,
     height: 36,
-    borderRadius: 999,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   iconWrapActive: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
   badge: {
     position: 'absolute',
@@ -203,13 +238,15 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     paddingHorizontal: 4,
-    backgroundColor: colors.accentCoral,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
     fontSize: 8,
-    color: colors.bg,
+    color: '#000000',
     fontFamily: fonts.mono,
     fontWeight: '700',
   },
@@ -224,7 +261,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
     borderRadius: 999,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     shadowColor: colors.shadowMed,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   ScrollView,
   Text,
@@ -28,6 +28,29 @@ export function CategorySlider({
   const allCategories = ['All', ...categories];
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Keep track of laid-out coordinates for each pill
+  const [layouts, setLayouts] = useState<Record<string, { x: number; width: number }>>({});
+
+  const indicatorX = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+  const indicatorOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    const layout = layouts[selectedCategory];
+    if (layout) {
+      indicatorX.value = withSpring(layout.x, { damping: 22, stiffness: 180 });
+      indicatorWidth.value = withSpring(layout.width, { damping: 22, stiffness: 180 });
+      indicatorOpacity.value = withTiming(1, { duration: 150 });
+    }
+  }, [selectedCategory, layouts]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    left: 0,
+    width: indicatorWidth.value,
+    transform: [{ translateX: indicatorX.value }],
+    opacity: indicatorOpacity.value,
+  }));
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -36,6 +59,9 @@ export function CategorySlider({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Shared sliding active background pill */}
+        <Animated.View style={[styles.activeBg, indicatorStyle]} />
+
         {allCategories.map((cat) => {
           const isActive = selectedCategory === cat;
           return (
@@ -44,6 +70,9 @@ export function CategorySlider({
               label={cat}
               isActive={isActive}
               onPress={() => onSelectCategory(cat)}
+              onLayout={(x, width) => {
+                setLayouts((prev) => ({ ...prev, [cat]: { x, width } }));
+              }}
             />
           );
         })}
@@ -56,22 +85,14 @@ interface CategoryPillProps {
   label: string;
   isActive: boolean;
   onPress: () => void;
+  onLayout: (x: number, width: number) => void;
 }
 
-function CategoryPill({ label, isActive, onPress }: CategoryPillProps) {
+function CategoryPill({ label, isActive, onPress, onLayout }: CategoryPillProps) {
   const scale = useSharedValue(1);
-  const activeOpacity = useSharedValue(isActive ? 1 : 0);
-
-  useEffect(() => {
-    activeOpacity.value = withTiming(isActive ? 1 : 0, { duration: 250 });
-  }, [isActive, activeOpacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-  }));
-
-  const activeBgStyle = useAnimatedStyle(() => ({
-    opacity: activeOpacity.value,
   }));
 
   const handlePressIn = () => {
@@ -83,16 +104,23 @@ function CategoryPill({ label, isActive, onPress }: CategoryPillProps) {
   };
 
   return (
-    <Animated.View style={[styles.pillContainer, animatedStyle]}>
+    <Animated.View
+      style={[
+        styles.pillContainer,
+        isActive && styles.pillActive,
+        animatedStyle,
+      ]}
+      onLayout={(e) => {
+        const { x, width } = e.nativeEvent.layout;
+        onLayout(x, width);
+      }}
+    >
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={onPress}
         style={styles.pillPressable}
       >
-        {/* Active Background layer that fades in/out */}
-        <Animated.View style={[styles.activeBg, activeBgStyle]} />
-
         {/* Label Text */}
         <Text
           style={[
@@ -117,34 +145,44 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     height: 40,
+    position: 'relative',
+  },
+  activeBg: {
+    position: 'absolute',
+    height: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 1,
+    borderRadius: 15,
+    zIndex: 1,
   },
   pillContainer: {
     height: 30,
-    borderRadius: 999,
+    borderRadius: 15,
     overflow: 'hidden',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.06)',
+    zIndex: 2,
+  },
+  pillActive: {
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
   pillPressable: {
     flex: 1,
     paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-  },
-  activeBg: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.accentCoral, // #34D399 (emerald active background)
   },
   pillText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontFamily: fonts.body,
-    fontWeight: '600',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   pillTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
   },
   pillTextInactive: {
     color: colors.textSecondary,

@@ -14,33 +14,33 @@ export const colors = {
   textOnDarkMuted: 'rgba(255, 255, 255, 0.7)',
 
   // Glass / Frosted (for glassy buttons)
-  glassBg: 'rgba(255, 255, 255, 0.03)',
-  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassBg: 'rgba(255, 255, 255, 0.04)',
+  glassBorder: 'rgba(255, 255, 255, 0.06)',
   glassShadow: 'rgba(0, 0, 0, 0.5)',
-  glassBgStrong: 'rgba(255, 255, 255, 0.06)',
-  glassBorderStrong: 'rgba(255, 255, 255, 0.12)',
+  glassBgStrong: 'rgba(255, 255, 255, 0.08)',
+  glassBorderStrong: 'rgba(255, 255, 255, 0.14)',
 
   // Borders
   borderSubtle: 'rgba(255, 255, 255, 0.05)',
   border: 'rgba(255, 255, 255, 0.08)',
   borderStrong: 'rgba(255, 255, 255, 0.12)',
-  borderActive: '#34D399',
+  borderActive: '#FFFFFF',
 
   // Accents
-  accentCoral: '#34D399',
-  accentCoralSoft: 'rgba(52, 211, 153, 0.1)',
+  accentCoral: '#FFFFFF',
+  accentCoralSoft: 'rgba(255, 255, 255, 0.08)',
   accentBrown: '#FFFFFF',
   accentBrownSoft: 'rgba(255, 255, 255, 0.08)',
-  accentGreen: '#34D399',
-  accentGreenSoft: 'rgba(52, 211, 153, 0.1)',
+  accentGreen: '#FFFFFF',
+  accentGreenSoft: 'rgba(255, 255, 255, 0.08)',
 
-  // Category icon tints
-  catOrange: '#F43F5E',
-  catAmber: '#F59E0B',
-  catEmerald: '#34D399',
-  catViolet: '#8B5CF6',
-  catFuchsia: '#D946EF',
-  catBlue: '#3B82F6',
+  // Category icon tints (monochrome white/gray)
+  catOrange: '#FFFFFF',
+  catAmber: '#FFFFFF',
+  catEmerald: '#FFFFFF',
+  catViolet: '#FFFFFF',
+  catFuchsia: '#FFFFFF',
+  catBlue: '#FFFFFF',
 
   // Shadows
   shadowSoft: 'rgba(0, 0, 0, 0.5)',
@@ -72,23 +72,11 @@ export const spacing = {
 
 export const fonts = {
   // Display (serif) — used for "STASH", titles, brand
-  display: Platform.select({
-    ios: 'Georgia',
-    android: 'serif',
-    default: 'Georgia',
-  }) as string,
+  display: 'Lato-Bold',
   // Body (sans-serif)
-  body: Platform.select({
-    ios: 'System',
-    android: 'sans-serif',
-    default: 'System',
-  }) as string,
+  body: 'Lato-Regular',
   // Monospace
-  mono: Platform.select({
-    ios: 'Menlo',
-    android: 'monospace',
-    default: 'Menlo',
-  }) as string,
+  mono: 'Lato-Medium',
 };
 
 import { Platform } from 'react-native';

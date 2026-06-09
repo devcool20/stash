@@ -38,7 +38,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
       <div id="storage-metrics-panel" className="glass-panel-base glass-border-diagonal p-5 rounded-2xl space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <div className="p-2 rounded-xl bg-white/10 border border-white/15 text-white">
               <Cpu className="w-4 h-4" />
             </div>
             <div>
@@ -51,14 +51,14 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
           </span>
         </div>
 
-        {/* Retro green scale progress line */}
+        {/* Retro progress line */}
         <div className="space-y-2">
           <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5 relative">
             <motion.div 
               initial={{ width: 0 }}
               animate={{ width: `${metrics.percent}%` }}
               transition={{ duration: 1, ease: 'easeOut' }}
-              className="h-full bg-linear-to-r from-emerald-600 to-emerald-400 rounded-full shadow-[0_0_10px_rgba(52,211,153,0.3)]"
+              className="h-full bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]"
             />
           </div>
           <div className="flex justify-between items-center text-[10px] font-mono text-gray-500">
@@ -79,7 +79,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         <div className="glass-panel-base glass-border-diagonal p-4 rounded-2xl space-y-3 bg-black/40">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-2 text-white">
-              <KeyRound className="w-4 h-4 text-emerald-400" />
+              <KeyRound className="w-4 h-4 text-white" />
               <span className="font-display text-xs font-medium">Decryption Key Envelope</span>
             </div>
             <div className="flex items-center space-x-1">
@@ -96,7 +96,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
                 id="copy-key-seed"
                 className="p-1 px-2 border border-white/5 rounded-md hover:bg-white/5 text-[#8A8A93] hover:text-white transition-colors cursor-pointer outline-none"
               >
-                {copiedKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                {copiedKey ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
               </button>
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
               onClick={() => setEnclave(!enclave)}
               id="switch-enclave"
               className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer outline-none relative shrink-0 ${
-                enclave ? 'bg-emerald-500' : 'bg-white/10'
+                enclave ? 'bg-white/30' : 'bg-white/10'
               }`}
             >
               <motion.div 
@@ -144,7 +144,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
               onClick={() => setBiometric(!biometric)}
               id="switch-biometric"
               className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer outline-none relative shrink-0 ${
-                biometric ? 'bg-emerald-500' : 'bg-white/10'
+                biometric ? 'bg-white/30' : 'bg-white/10'
               }`}
             >
               <motion.div 
@@ -168,7 +168,7 @@ export default function SettingsTab({ onResetDatabase }: SettingsTabProps) {
               onClick={() => setZeroLeak(!zeroLeak)}
               id="switch-zero-leak"
               className={`w-11 h-6 rounded-full p-0.5 transition-colors cursor-pointer outline-none relative shrink-0 ${
-                zeroLeak ? 'bg-emerald-500' : 'bg-white/10'
+                zeroLeak ? 'bg-white/30' : 'bg-white/10'
               }`}
             >
               <motion.div 

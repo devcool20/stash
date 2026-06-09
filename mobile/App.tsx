@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useFonts } from 'expo-font';
 
 import { db } from './src/database';
 import { StashItem, TabKey, CategoryKey } from './src/types';
@@ -23,6 +24,16 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { colors } from './src/theme/colors';
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Lato-Regular': require('./assets/fonts/Lato-Regular.ttf'),
+    'Lato-Medium': require('./assets/fonts/Lato-Medium.ttf'),
+    'Lato-Bold': require('./assets/fonts/Lato-Bold.ttf'),
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   const [activeTab, setActiveTab] = useState<TabKey>('stash');
   const [items, setItems] = useState<StashItem[]>([]);
   const [pendingItems, setPendingItems] = useState<StashItem[]>([]);

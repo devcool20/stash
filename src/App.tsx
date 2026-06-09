@@ -11,6 +11,7 @@ import FocusInspector from './components/FocusInspector';
 import MasonryGrid from './components/MasonryGrid';
 import CategoriesTab from './components/CategoriesTab';
 import SettingsTab from './components/SettingsTab';
+import CategorySlider from './components/CategorySlider';
 
 export default function App() {
   // Navigation State
@@ -90,7 +91,7 @@ export default function App() {
   const getFilteredItems = () => {
     let dataset = searchQuery.trim() ? db.search(searchQuery) : items;
     
-    if (activeTab === 'categories' && selectedCategory !== 'All') {
+    if (selectedCategory !== 'All') {
       dataset = dataset.filter(item => item.category === selectedCategory);
     }
     
@@ -143,11 +144,11 @@ export default function App() {
             <span className="text-[8px] font-mono tracking-widest text-[#8A8A93] uppercase mt-1">LOCAL-FIRST INBOX</span>
           </div>
 
-          <div className="w-9 h-9 flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 flex items-center justify-center shrink-0">
             <Lottie 
               animationData={birdyAnimation} 
               loop={true} 
-              className="w-9 h-9"
+              className="w-11 h-11"
             />
           </div>
         </header>
@@ -155,13 +156,13 @@ export default function App() {
         {/* Dynamic Search Box interceptor */}
         {activeTab !== 'profile' && (
           <div className="mb-3.5 relative z-20 shrink-0" id="search-interceptor-box">
-            <div className={`relative flex items-center h-11 px-3 bg-white/[0.04] border ${searchFocused ? 'border-emerald-500/30 ring-1 ring-emerald-500/15' : 'border-white/[0.06]'} rounded-2xl transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)]`}>
+            <div className={`relative flex items-center h-11 px-3 bg-white/[0.04] border ${searchFocused ? 'border-white/30 ring-1 ring-white/10' : 'border-white/[0.06]'} rounded-2xl transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.4)]`}>
               
               {/* Highlight shimmer glow overlay */}
-              <div className={`absolute inset-0 bg-emerald-500/[0.02] rounded-2xl transition-opacity duration-300 pointer-events-none ${searchFocused ? 'opacity-100' : 'opacity-0'}`} />
+              <div className={`absolute inset-0 bg-white/[0.01] rounded-2xl transition-opacity duration-300 pointer-events-none ${searchFocused ? 'opacity-100' : 'opacity-0'}`} />
 
               {/* Glowing Icon Wrapper */}
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/10 text-emerald-400 shrink-0 z-10 mr-2.5">
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-white/10 text-white shrink-0 z-10 mr-2.5">
                 <Search className="w-3.5 h-3.5" />
               </div>
 
@@ -183,6 +184,16 @@ export default function App() {
               </div>
 
             </div>
+          </div>
+        )}
+
+        {activeTab === 'stash' && (
+          <div className="mb-3">
+            <CategorySlider
+              categories={db.getCategories()}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
           </div>
         )}
 
@@ -312,16 +323,7 @@ export default function App() {
   return (
     <div 
       className="relative min-h-screen bg-black text-white font-sans antialiased overflow-x-hidden selection:bg-white selection:text-black"
-      style={{
-        backgroundImage: 'radial-gradient(circle at 10% 82%, #0A1C16 0%, transparent 45%), radial-gradient(circle at 90% 18%, #120E2E 0%, transparent 45%)'
-      }}
     >
-      
-      {/* Background slow-rotating decorative atmospheric gradient glow orbs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="orb-indigo -top-20 -left-20 opacity-60" />
-        <div className="orb-emerald bottom-10 -right-20 opacity-50" />
-      </div>
 
       {/* FIXED PLATFORM UTILITY CONTROLLER HEADER (Figma / Arc layout look) */}
       <div className="relative z-30 w-full border-b border-white/5 bg-black/60 backdrop-blur-xl px-4 py-3 sm:px-6">
@@ -329,8 +331,8 @@ export default function App() {
           
           <div className="flex items-center space-x-3">
             <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/40 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
             </span>
             <div className="font-mono text-gray-400 uppercase text-[10px] tracking-widest flex items-center gap-1.5">
               <span>SANDBOX ENGINE:</span>
@@ -375,7 +377,7 @@ export default function App() {
           {/* Interactive virtual mobile phone container parameters controller pane */}
           <div className="w-full lg:w-72 bg-white/[0.02] backdrop-blur-2xl border border-white/10 rounded-3xl p-5 space-y-4 shadow-2xl relative self-start lg:sticky lg:top-24">
             <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <Sparkles className="w-4 h-4 text-white" />
               <h4 className="font-display font-semibold text-xs tracking-wider uppercase text-white">App Simulator Rules</h4>
             </div>
 
@@ -455,7 +457,7 @@ export default function App() {
               {/* Camera Dynamic Island capsule bar */}
               <div className="absolute top-3 left-1/2 -translate-x-1/2 w-28 h-6 bg-black rounded-full z-45 flex items-center justify-center border border-white/5 shadow-inner">
                 {/* Selfie lens */}
-                <div className="w-2.5 h-2.5 rounded-full bg-[#0d0d14] border border-emerald-900/10 mr-12 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#0d0d14] border border-white/10 mr-12 flex items-center justify-center">
                   <div className="w-1 h-1 bg-[#05051a] rounded-full animate-pulse" />
                 </div>
                 {/* Proximity dot sensor */}
@@ -481,11 +483,11 @@ export default function App() {
 
                   {/* Battery representation */}
                   <div className="flex items-center space-x-1">
-                    {isCharging && <span className="text-[7px] text-emerald-400 font-mono animate-bounce">⚡</span>}
+                    {isCharging && <span className="text-[7px] text-white font-mono animate-bounce">⚡</span>}
                     <span className="text-[9px] font-mono text-white/80">{batteryLevel}%</span>
                     <div className="w-5 h-2.5 border border-white/30 rounded-[3px] p-[1px] flex items-center">
                       <div 
-                        className={`h-full rounded-[1px] transition-all duration-300 ${batteryLevel <= 20 ? 'bg-red-500' : isCharging ? 'bg-emerald-400 animate-pulse' : 'bg-white'}`}
+                        className={`h-full rounded-[1px] transition-all duration-300 ${batteryLevel <= 20 ? 'bg-neutral-600' : isCharging ? 'bg-white animate-pulse' : 'bg-white'}`}
                         style={{ width: `${batteryLevel}%` }}
                       />
                     </div>
@@ -497,7 +499,7 @@ export default function App() {
               <div 
                 className="flex-1 w-full relative overflow-hidden transform scale-100 translate-x-y-z"
                 style={{
-                  backgroundImage: 'radial-gradient(circle at 12% 82%, #0A1C16 0%, transparent 45%), radial-gradient(circle at 88% 18%, #120E2E 0%, transparent 45%)'
+                  backgroundImage: 'radial-gradient(circle at 12% 82%, #0A0A0A 0%, transparent 45%), radial-gradient(circle at 88% 18%, #141414 0%, transparent 45%)'
                 }}
               >
                 {/* Interactive mobile contents */}

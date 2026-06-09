@@ -308,13 +308,13 @@ export function FocusInspector({
                         >
                           {copied ? (
                             <Check
-                              color={colors.bg}
+                              color="#FFFFFF"
                               size={11}
                               strokeWidth={2.4}
                             />
                           ) : (
                             <Copy
-                              color={colors.bg}
+                              color="#FFFFFF"
                               size={11}
                               strokeWidth={2.4}
                             />
@@ -393,8 +393,8 @@ export function FocusInspector({
                           style={[
                             styles.regroupItemText,
                             item.category === cat && {
-                              color: colors.textOnDark,
-                              fontWeight: '600',
+                              color: '#FFFFFF',
+                              fontWeight: '700',
                             },
                           ]}
                         >
@@ -654,12 +654,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 999,
     gap: 5,
   },
   copyText: {
-    color: colors.bg,
+    color: '#FFFFFF',
     fontSize: 9.5,
     fontFamily: fonts.body,
     fontWeight: '700',
@@ -739,12 +741,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   regroupItemActive: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   regroupItemText: {
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     fontSize: 10.5,
     fontFamily: fonts.body,
     fontWeight: '500',

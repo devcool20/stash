@@ -108,18 +108,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   boxFocused: {
-    borderColor: 'rgba(52, 211, 153, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   shimmerOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(52, 211, 153, 0.04)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderRadius: 16,
   },
   iconContainer: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,

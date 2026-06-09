@@ -75,7 +75,7 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         <View style={styles.vaultHeader}>
           <View style={styles.vaultIconBox}>
             <ShieldCheck
-              color={colors.bg}
+              color="#FFFFFF"
               size={16}
               strokeWidth={2.4}
             />
@@ -95,7 +95,7 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         >
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              <User color={colors.bgCard} size={16} strokeWidth={2.4} />
+              <User color="#FFFFFF" size={16} strokeWidth={2.4} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.profileName}>LOCAL OPERATOR</Text>
@@ -189,10 +189,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
                 styles.switchTrack,
                 {
                   backgroundColor: localSync
-                    ? colors.accentGreen
+                    ? 'rgba(255, 255, 255, 0.25)'
                     : colors.glassBg,
                   borderColor: localSync
-                    ? colors.accentGreen
+                    ? 'rgba(255, 255, 255, 0.45)'
                     : colors.borderSubtle,
                 },
               ]}
@@ -404,10 +404,10 @@ function GlassToggleRow({
           styles.switchTrack,
           {
             backgroundColor: value
-              ? colors.accentCoral
+              ? 'rgba(255, 255, 255, 0.25)'
               : colors.glassBg,
             borderColor: value
-              ? colors.accentCoral
+              ? 'rgba(255, 255, 255, 0.45)'
               : colors.borderSubtle,
           },
         ]}
@@ -458,7 +458,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -487,7 +489,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -729,7 +733,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: colors.bgCard,
+    backgroundColor: '#FFFFFF',
     shadowColor: colors.shadowMed,
     shadowOpacity: 0.25,
     shadowRadius: 3,

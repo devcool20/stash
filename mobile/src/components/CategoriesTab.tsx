@@ -36,27 +36,19 @@ const getCategoryDef = (id: string): CategoryDef => {
     case 'All':
       return { id: 'All', label: 'Vault (All)', icon: Layers, color: colors.textPrimary };
     case 'Shopping':
-      return { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.catOrange };
+      return { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.textPrimary };
     case 'Recipes':
-      return { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.catAmber };
+      return { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.textPrimary };
     case 'Travel':
-      return { id: 'Travel', label: 'Travel', icon: Compass, color: colors.catEmerald };
+      return { id: 'Travel', label: 'Travel', icon: Compass, color: colors.textPrimary };
     case 'Articles':
-      return { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.catViolet };
+      return { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.textPrimary };
     case 'Design':
-      return { id: 'Design', label: 'Design', icon: Palette, color: colors.catFuchsia };
+      return { id: 'Design', label: 'Design', icon: Palette, color: colors.textPrimary };
     case 'People':
-      return { id: 'People', label: 'People', icon: Layers, color: '#38BDF8' };
+      return { id: 'People', label: 'People', icon: Layers, color: colors.textPrimary };
     default:
-      const categoryColors = [
-        '#38BDF8', // sky
-        '#4ADE80', // green
-        '#C084FC', // purple
-        '#F472B6', // pink
-        '#2DD4BF', // teal
-      ];
-      const index = Math.abs(id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % categoryColors.length;
-      return { id, label: id, icon: Layers, color: categoryColors[index] };
+      return { id, label: id, icon: Layers, color: colors.textPrimary };
   }
 };
 
@@ -118,9 +110,7 @@ export function CategoriesTab({
                     ]}
                   >
                     <Icon
-                      color={
-                        isSelected ? colors.bgCard : cat.color
-                      }
+                      color="#FFFFFF"
                       size={16}
                       strokeWidth={2}
                     />
@@ -215,8 +205,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBoxActive: {
-    backgroundColor: colors.accentCoral,
-    borderColor: colors.accentCoral,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   selDot: {
     width: 6,

@@ -151,12 +151,7 @@ function GridCard({
               </View>
             ) : null}
 
-            <View
-              style={[
-                styles.catPill,
-                { backgroundColor: catColor },
-              ]}
-            >
+            <View style={styles.catPill}>
               {getCategoryIcon(item.category)}
             </View>
 
@@ -276,6 +271,9 @@ const styles = StyleSheet.create({
     left: 10,
     padding: 6,
     borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     zIndex: 10,
     shadowColor: colors.shadowMed,
     shadowOpacity: 0.3,

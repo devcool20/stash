@@ -14,29 +14,21 @@ export default function CategoriesTab({ selectedCategory, onSelectCategory }: Ca
   const getCategoryConfig = (id: string) => {
     switch (id) {
       case 'All':
-        return { label: 'All STASH', icon: Layers, glow: 'rgba(255, 255, 255, 0.1)', color: 'text-white', bg: 'bg-white' };
+        return { label: 'All STASH', icon: Layers, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'Shopping':
-        return { label: 'Shopping', icon: ShoppingBag, glow: 'rgba(244, 63, 94, 0.25)', color: 'text-rose-400', bg: 'bg-rose-500' };
+        return { label: 'Shopping', icon: ShoppingBag, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'Recipes':
-        return { label: 'Recipes', icon: Utensils, glow: 'rgba(245, 158, 11, 0.25)', color: 'text-amber-400', bg: 'bg-amber-500' };
+        return { label: 'Recipes', icon: Utensils, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'Travel':
-        return { label: 'Travel', icon: Compass, glow: 'rgba(16, 185, 129, 0.25)', color: 'text-emerald-400', bg: 'bg-emerald-500' };
+        return { label: 'Travel', icon: Compass, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'Articles':
-        return { label: 'Articles', icon: BookOpen, glow: 'rgba(139, 92, 246, 0.25)', color: 'text-violet-400', bg: 'bg-violet-500' };
+        return { label: 'Articles', icon: BookOpen, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'Design':
-        return { label: 'Design', icon: Layers, glow: 'rgba(217, 70, 239, 0.25)', color: 'text-fuchsia-400', bg: 'bg-fuchsia-500' };
+        return { label: 'Design', icon: Layers, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       case 'People':
-        return { label: 'People', icon: Layers, glow: 'rgba(56, 189, 248, 0.25)', color: 'text-sky-400', bg: 'bg-sky-500' };
+        return { label: 'People', icon: Layers, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
       default:
-        const colors = [
-          { glow: 'rgba(14, 165, 233, 0.25)', color: 'text-sky-400', bg: 'bg-sky-500' },
-          { glow: 'rgba(34, 197, 94, 0.25)', color: 'text-green-400', bg: 'bg-green-500' },
-          { glow: 'rgba(168, 85, 247, 0.25)', color: 'text-purple-400', bg: 'bg-purple-500' },
-          { glow: 'rgba(236, 72, 153, 0.25)', color: 'text-pink-400', bg: 'bg-pink-500' },
-          { glow: 'rgba(20, 184, 166, 0.25)', color: 'text-teal-400', bg: 'bg-teal-500' }
-        ];
-        const index = Math.abs(id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % colors.length;
-        return { label: id, icon: Layers, ...colors[index] };
+        return { label: id, icon: Layers, glow: 'rgba(255, 255, 255, 0.15)', color: 'text-white', bg: 'bg-white' };
     }
   };
 

@@ -184,7 +184,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
                       id="ocr-copy-all"
                       className="inline-flex items-center space-x-1.5 py-1 px-3 mt-1.5 bg-white text-black font-semibold rounded-full hover:bg-gray-200 outline-none active:scale-95 transition-all cursor-pointer font-display text-[10px] select-none"
                     >
-                      {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                      {copied ? <Check className="w-3 h-3 text-black" /> : <Copy className="w-3 h-3" />}
                       <span>{copied ? 'COPIED TO CLIPBOARD' : 'COPY ALL'}</span>
                     </button>
                   </div>

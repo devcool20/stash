@@ -30,6 +30,18 @@ import { db } from '../database';
 import { processImage } from '../processing';
 import { StashItem } from '../types';
 import { colors, fonts } from '../theme/colors';
+import { MultiStepLoader } from './MultiStepLoader';
+
+const loadingStates = [
+  { text: 'Capturing screenshot context' },
+  { text: 'Initializing OCR parsing engine' },
+  { text: 'Extracting visual text elements' },
+  { text: 'Analyzing semantic metadata' },
+  { text: 'Synthesizing product identity' },
+  { text: 'Auto-categorizing stash resource' },
+  { text: 'Indexing to local secure vault' }
+];
+
 
 interface AddStashModalProps {
   visible: boolean;
@@ -51,6 +63,7 @@ export function AddStashModal({
     name: string;
     size?: number;
   } | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<number | null>(null);
 
   const executePipeline = async (
     type: 'link' | 'image',
@@ -63,6 +76,10 @@ export function AddStashModal({
   ) => {
     setLoading(true);
     setError(null);
+    setPipelineStep(0);
+
+    await new Promise(r => setTimeout(r, 450));
+    setPipelineStep(1);
 
     const tempItem = await db.add({
       type,
@@ -81,6 +98,8 @@ export function AddStashModal({
     onSuccess(tempItem);
 
     try {
+      await new Promise(r => setTimeout(r, 300));
+      setPipelineStep(2);
       let finalTitle = tempItem.title;
       let finalDesc = tempItem.description || '';
       let finalImg = tempItem.imageUrl || '';
@@ -90,6 +109,7 @@ export function AddStashModal({
       let finalCategory = '';
 
       if (type === 'link') {
+        setPipelineStep(3);
         let resolvedUrl = source.url || '';
         if (!/^https?:\/\//i.test(resolvedUrl)) {
           resolvedUrl = 'https://' + resolvedUrl;
@@ -98,13 +118,16 @@ export function AddStashModal({
         try {
           domain = new URL(resolvedUrl).hostname;
         } catch {}
+        setPipelineStep(4);
         finalTitle = domain.replace('www.', '').split('.')[0].toUpperCase() + ' Link Note';
         finalDesc = `Ingested from ${domain}`;
         finalImg = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
         finalSource = resolvedUrl;
         finalFavicon = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
       } else if (source.imageUri) {
+        setPipelineStep(3);
         const result = await processImage(source.imageUri, source.title);
+        setPipelineStep(4);
         finalTitle = result.title;
         finalDesc = result.description || result.summary;
         finalOcr = result.extractedText;
@@ -112,10 +135,13 @@ export function AddStashModal({
         finalCategory = result.category;
       }
 
+      await new Promise(r => setTimeout(r, 300));
+      setPipelineStep(5);
       const category = finalCategory && finalCategory.trim()
         ? finalCategory.trim()
         : autoCategorize(finalOcr || finalDesc || '', finalTitle, finalSource);
 
+      setPipelineStep(6);
       const readyItem = await db.update(tempItem.id, {
         title: finalTitle,
         description: finalDesc,
@@ -127,9 +153,11 @@ export function AddStashModal({
         status: 'ready',
       });
 
+      await new Promise(r => setTimeout(r, 400));
       if (readyItem) onSuccess(readyItem);
       setUrl('');
       setSelectedImage(null);
+      setPipelineStep(null);
       onClose();
     } catch (err: any) {
       setError(err?.message || 'Processing failed.');
@@ -137,6 +165,7 @@ export function AddStashModal({
       onSuccess({} as any);
     } finally {
       setLoading(false);
+      setPipelineStep(null);
     }
   };
 
@@ -259,16 +288,7 @@ export function AddStashModal({
                 </View>
               )}
 
-              {loading ? (
-                <Animated.View
-                  entering={FadeIn.duration(200)}
-                  style={styles.loadingBox}
-                >
-                  <ActivityIndicator color={colors.textPrimary} size={24} />
-                  <Text style={styles.loadingText}>Indexing into your vault...</Text>
-                  <Text style={styles.loadingSub}>Local processing — stays on device</Text>
-                </Animated.View>
-              ) : mode === 'url' ? (
+              {mode === 'url' ? (
                 <View style={{ gap: 14 }}>
                   <View style={styles.inputRow}>
                     <TextInput
@@ -289,7 +309,7 @@ export function AddStashModal({
                         pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
                       ]}
                     >
-                      <Search color={colors.bg} size={14} strokeWidth={2.4} />
+                      <Search color="#FFFFFF" size={14} strokeWidth={2.4} />
                     </Pressable>
                   </View>
                 </View>
@@ -348,6 +368,12 @@ export function AddStashModal({
             </ScrollView>
           </View>
         </Animated.View>
+
+        <MultiStepLoader
+          loadingStates={loadingStates}
+          loading={loading}
+          value={pipelineStep !== null ? pipelineStep : 0}
+        />
       </View>
     </Modal>
   );
@@ -390,7 +416,7 @@ const styles = StyleSheet.create({
   sheetPanel: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: colors.bg,
+    backgroundColor: 'rgba(10, 10, 10, 0.65)',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
@@ -408,7 +434,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 18,
     paddingBottom: 12,
-    backgroundColor: colors.bg,
+    backgroundColor: 'transparent',
   },
   title: {
     color: colors.textPrimary,
@@ -453,8 +479,8 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorder,
   },
   modeTabActive: {
-    backgroundColor: colors.textPrimary,
-    borderColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   modeText: {
     fontSize: 9.5,
@@ -464,7 +490,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   modeTextActive: {
-    color: colors.bg,
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   scroll: {
@@ -524,7 +550,9 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     padding: 9,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 10,
   },
   dropzone: {
@@ -591,13 +619,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryBtn: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     paddingVertical: 12,
     borderRadius: 999,
     alignItems: 'center',
   },
   primaryBtnText: {
-    color: colors.bg,
+    color: '#FFFFFF',
     fontSize: 11,
     fontFamily: fonts.body,
     fontWeight: '700',

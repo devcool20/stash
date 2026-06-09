@@ -3,6 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Link2, CheckCircle, Search, Loader2, Image as ImageIcon } from 'lucide-react';
 import { db } from '../database';
 import { StashItem } from '../types';
+import { MultiStepLoader } from './ui/multi-step-loader';
+
+const loadingStates = [
+  { text: 'INTENT CAPTURED & TEMP STAGED' },
+  { text: 'LOCAL SECTOR INSTANT RE-RENDER' },
+  { text: 'CLIENT CLOUD ANALYSIS & OCR SCAN' },
+  { text: 'INDEX TO ENCRYPTED FTS DATABASE' }
+];
+
 
 interface AddStashModalProps {
   isOpen: boolean;
@@ -253,40 +262,45 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      id="add-stash-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-    >
+    <>
+      <MultiStepLoader
+        loadingStates={loadingStates}
+        loading={loading}
+        value={pipelineStep !== null ? pipelineStep : 0}
+      />
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 180, mass: 0.8 }}
-        id="add-stash-modal-box"
-        className="glass-panel-base glass-border-diagonal w-full max-w-lg overflow-hidden rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.9)] bg-black/40 text-white"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.25 }}
+        id="add-stash-overlay"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
       >
-        {/* Header bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-          <h2 className="font-display font-medium text-lg tracking-tight text-white flex items-center">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2.5 animate-pulse" />
-            INGESTION CHANNEL
-          </h2>
-          <button 
-            id="close-stash-modal"
-            onClick={onClose} 
-            className="text-gray-400 hover:text-white transition-colors cursor-pointer outline-none"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 180, mass: 0.8 }}
+          id="add-stash-modal-box"
+          className="glass-panel-base glass-border-diagonal w-full max-w-lg overflow-hidden rounded-2xl shadow-[0_30px_70px_rgba(0,0,0,0.9)] bg-black/40 text-white"
+        >
+          {/* Header bar */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/[0.02]">
+            <h2 className="font-display font-medium text-lg tracking-tight text-white flex items-center">
+              <span className="w-2 h-2 rounded-full bg-white mr-2.5 animate-pulse" />
+              INGESTION CHANNEL
+            </h2>
+            <button 
+              id="close-stash-modal"
+              onClick={onClose} 
+              className="text-gray-400 hover:text-white transition-colors cursor-pointer outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        <div className="p-6 space-y-6">
-          {/* Main simulation selection toggles */}
-          {!pipelineStep && (
+          <div className="p-6 space-y-6">
+            {/* Main simulation selection toggles */}
             <div className="flex bg-white/5 p-1 rounded-full border border-white/5">
               <button
                 id="type-link-toggle"
@@ -317,75 +331,16 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
                 </div>
               </button>
             </div>
-          )}
 
-          {/* Form and pipeline areas */}
-          {error && (
-            <div id="pipeline-error" className="p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-red-300 text-xs">
-              {error}
-            </div>
-          )}
+            {/* Form and pipeline areas */}
+            {error && (
+              <div id="pipeline-error" className="p-3 bg-red-950/40 border border-red-900/50 rounded-lg text-red-300 text-xs">
+                {error}
+              </div>
+            )}
 
-          <AnimatePresence mode="wait">
-            {pipelineStep !== null ? (
-              /* High-fidelity 4-step pipeline progress indicator */
-              <motion.div
-                key="pipeline"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                id="pipeline-progress"
-                className="space-y-6 py-4"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">EXECUTION LIFECYCLE PIPELINE</span>
-                  <div className="flex items-center space-x-1 text-xs text-white">
-                    <Loader2 className="w-3 h-3 animate-spin text-white" />
-                    <span className="font-mono text-xs">{pipelineStep + 1}/4</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  {[
-                    '1. INTENT CAPTURED & TEMP STAGED',
-                    '2. LOCAL SECTOR INSTANT RE-RENDER',
-                    '3. CLIENT CLOUD ANALYSIS/OCR OCR',
-                    '4. INDEX TO ENCRYPTED FTS DATABASE'
-                  ].map((stepLabel, idx) => {
-                    const isDone = pipelineStep > idx;
-                    const isActive = pipelineStep === idx;
-                    return (
-                      <div 
-                        key={idx} 
-                        id={`pipeline-step-${idx}`}
-                        className={`flex items-center space-x-3 p-2.5 rounded-lg border transition-all duration-300 ${
-                          isDone 
-                            ? 'bg-emerald-950/10 border-emerald-900/30 text-emerald-400' 
-                            : isActive 
-                            ? 'bg-white/[0.05] border-white/20 text-white scale-[1.01] shadow-[0_0_15px_rgba(255,255,255,0.05)]' 
-                            : 'bg-transparent border-transparent text-[#8A8A93]'
-                        }`}
-                      >
-                        {isDone ? (
-                          <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
-                        ) : isActive ? (
-                          <Loader2 className="w-4 h-4 shrink-0 animate-spin text-white" />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full border border-[#8A8A93] flex items-center justify-center text-[9px] font-mono">
-                            {idx + 1}
-                          </div>
-                        )}
-                        <span className="font-mono text-xs tracking-tight font-medium">{stepLabel}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="p-3 bg-white/[0.02] border border-white/5 rounded-lg text-center font-mono text-[10px] text-[#8A8A93]">
-                  {pipelineProgress}
-                </div>
-              </motion.div>
-            ) : ingestType === 'link' ? (
+            <AnimatePresence mode="wait">
+              {ingestType === 'link' ? (
               /* Link Submission Form */
               <motion.form
                 key="link-form"
@@ -443,7 +398,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
                     dragActive 
                       ? 'border-white bg-white/[0.05]' 
                       : selectedImageBase64 
-                      ? 'border-emerald-500/50 bg-emerald-950/5' 
+                      ? 'border-white/30 bg-white/5' 
                       : 'border-white/10 hover:border-white/30 bg-[#000000]'
                   }`}
                 >
@@ -462,7 +417,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
                         alt="Preview" 
                         className="h-28 object-contain rounded-lg border border-white/10"
                       />
-                      <span className="text-xs text-emerald-400 flex items-center justify-center font-mono">
+                      <span className="text-xs text-white flex items-center justify-center font-mono">
                         <CheckCircle className="w-3.5 h-3.5 mr-1" />
                         Capture Ready ({selectedImageFile ? (selectedImageFile.size/1024).toFixed(0) : 'Preset'} KB)
                       </span>
@@ -521,5 +476,6 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         </div>
       </motion.div>
     </motion.div>
+    </>
   );
 }
