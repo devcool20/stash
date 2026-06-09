@@ -6,28 +6,18 @@ export interface StashItem {
   imageUrl?: string;
   sourceUrl?: string;
   favicon?: string;
-  category: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design';
+  category: string;
   extractedText?: string;
-  status: 'processing' | 'ready';
+  summary?: string;
+  status: 'pending' | 'processing' | 'ready';
   createdAt: string;
 }
 
-export type ActiveCategory =
-  | 'All'
-  | 'Shopping'
-  | 'Recipes'
-  | 'Travel'
-  | 'Articles'
-  | 'Design';
+export type ActiveCategory = string;
 
 export type TabKey = 'stash' | 'categories' | 'profile';
 
-export type CategoryKey =
-  | 'Shopping'
-  | 'Recipes'
-  | 'Travel'
-  | 'Articles'
-  | 'Design';
+export type CategoryKey = string;
 
 export interface StorageMetrics {
   usedBytes: number;

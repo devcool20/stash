@@ -151,9 +151,22 @@ export const DEFAULT_ITEMS: StashItem[] = [
 
 class StashDatabase {
   private items: StashItem[] = [];
+  private listeners: (() => void)[] = [];
 
   constructor() {
     this.load();
+    this.sync();
+  }
+
+  public onChange(listener: () => void): () => void {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach(l => l());
   }
 
   private load() {
@@ -178,6 +191,27 @@ class StashDatabase {
     }
   }
 
+  public async sync() {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3500); // 3.5s sync timeout
+      const res = await fetch('/api/items', { signal: controller.signal });
+      clearTimeout(timeout);
+      
+      if (res.ok) {
+        const serverItems = await res.json();
+        if (Array.isArray(serverItems) && serverItems.length > 0) {
+          this.items = serverItems;
+          this.save();
+          this.notify();
+          console.log('[Database] Web sync successful. Ingested items from backend REST server.');
+        }
+      }
+    } catch (e) {
+      console.warn('[Database] Web sync failed, running in local-offline cache fallback mode:', e);
+    }
+  }
+
   public getAll(): StashItem[] {
     return [...this.items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
@@ -192,7 +226,7 @@ class StashDatabase {
     if (tokens.length === 0) return this.getAll();
 
     return this.getAll().filter(item => {
-      const searchableText = `${item.title} ${item.description || ''} ${item.extractedText || ''} ${item.sourceUrl || ''} ${item.category}`.toLowerCase();
+      const searchableText = `${item.title} ${item.description || ''} ${item.summary || ''} ${item.extractedText || ''} ${item.sourceUrl || ''} ${item.category}`.toLowerCase();
       
       // Every search token must match some part of the item searchable string (FTS AND logic)
       return tokens.every(token => searchableText.includes(token));
@@ -203,14 +237,23 @@ class StashDatabase {
     return this.getAll().filter(item => item.category === category);
   }
 
-  public add(item: Omit<StashItem, 'id' | 'createdAt'>): StashItem {
+  public add(item: Omit<StashItem, 'id' | 'createdAt'> & { id?: string; createdAt?: string }): StashItem {
     const newItem: StashItem = {
       ...item,
-      id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      createdAt: new Date().toISOString()
-    };
+      id: item.id || `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      createdAt: item.createdAt || new Date().toISOString()
+    } as StashItem;
     this.items.unshift(newItem);
     this.save();
+    this.notify();
+
+    // Sync to backend asynchronously
+    fetch('/api/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem)
+    }).catch(err => console.warn('[Database] Background sync failed for add:', err));
+
     return newItem;
   }
 
@@ -223,6 +266,15 @@ class StashDatabase {
       ...updates
     };
     this.save();
+    this.notify();
+
+    // Sync to backend asynchronously
+    fetch(`/api/items/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(this.items[index])
+    }).catch(err => console.warn('[Database] Background sync failed for update:', err));
+
     return this.items[index];
   }
 
@@ -230,6 +282,13 @@ class StashDatabase {
     const initialLen = this.items.length;
     this.items = this.items.filter(item => item.id !== id);
     this.save();
+    this.notify();
+
+    // Sync to backend asynchronously
+    fetch(`/api/items/${id}`, {
+      method: 'DELETE'
+    }).catch(err => console.warn('[Database] Background sync failed for delete:', err));
+
     return this.items.length < initialLen;
   }
 
@@ -266,6 +325,12 @@ class StashDatabase {
   public reset() {
     this.items = [...DEFAULT_ITEMS];
     this.save();
+    this.notify();
+
+    // Sync to backend asynchronously
+    fetch('/api/items/reset', {
+      method: 'POST'
+    }).catch(err => console.warn('[Database] Background sync failed for reset:', err));
   }
 }
 

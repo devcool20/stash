@@ -8,77 +8,36 @@ import {
   Platform,
 } from 'react-native';
 import {
+  Layers,
   ShoppingBag,
   Utensils,
   Compass,
   BookOpen,
-  Layers,
+  Palette,
 } from 'lucide-react-native';
 import { ActiveCategory, CategoryKey } from '../types';
 import { db } from '../database';
-import { colors } from '../theme/colors';
+import { colors, fonts, radii } from '../theme/colors';
 
 interface CategoriesTabProps {
   selectedCategory: ActiveCategory;
   onSelectCategory: (cat: ActiveCategory) => void;
 }
 
-const CATEGORIES: {
+interface CategoryDef {
   id: ActiveCategory;
   label: string;
   icon: any;
-  glow: string;
   color: string;
-  bg: string;
-}[] = [
-  {
-    id: 'All',
-    label: 'All STASH',
-    icon: Layers,
-    glow: 'rgba(255, 255, 255, 0.1)',
-    color: '#FFFFFF',
-    bg: '#FFFFFF',
-  },
-  {
-    id: 'Shopping',
-    label: 'Shopping',
-    icon: ShoppingBag,
-    glow: 'rgba(244, 63, 94, 0.25)',
-    color: '#FB7185', // rose-400
-    bg: '#F43F5E',
-  },
-  {
-    id: 'Recipes',
-    label: 'Recipes',
-    icon: Utensils,
-    glow: 'rgba(245, 158, 11, 0.25)',
-    color: '#FBBF24', // amber-400
-    bg: '#F59E0B',
-  },
-  {
-    id: 'Travel',
-    label: 'Travel',
-    icon: Compass,
-    glow: 'rgba(16, 185, 129, 0.25)',
-    color: '#34D399', // emerald-400
-    bg: '#10B981',
-  },
-  {
-    id: 'Articles',
-    label: 'Articles',
-    icon: BookOpen,
-    glow: 'rgba(139, 92, 246, 0.25)',
-    color: '#A78BFA', // violet-400
-    bg: '#8B5CF6',
-  },
-  {
-    id: 'Design',
-    label: 'Design',
-    icon: Layers,
-    glow: 'rgba(217, 70, 239, 0.25)',
-    color: '#E879F9', // fuchsia-400
-    bg: '#D946EF',
-  },
+}
+
+const CATEGORIES: CategoryDef[] = [
+  { id: 'All', label: 'Vault (All)', icon: Layers, color: colors.textPrimary },
+  { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.catOrange },
+  { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.catAmber },
+  { id: 'Travel', label: 'Travel', icon: Compass, color: colors.catEmerald },
+  { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.catViolet },
+  { id: 'Design', label: 'Design', icon: Palette, color: colors.catFuchsia },
 ];
 
 export function CategoriesTab({
@@ -98,23 +57,17 @@ export function CategoriesTab({
   }, []);
 
   return (
-    // web: space-y-4 py-1
     <View style={styles.container}>
-      {/* web: flex items-center justify-between px-1 */}
       <View style={styles.headerRow}>
-        {/* web: text-[10px] uppercase font-display tracking-widest text-[#8A8A93] */}
-        <Text style={styles.headerLabel}>SMART LIBRARY LENSES</Text>
-        {/* web: font-mono text-[9px] text-[#8A8A93] */}
-        <Text style={styles.headerSub}>5 AUTO-CLUSTERING CORES</Text>
+        <Text style={styles.headerLabel}>COLLECTIONS</Text>
       </View>
 
-      {/* web: flex space-x-3 overflow-x-auto pb-4 pt-1 px-1 */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        snapToInterval={TILE_SIZE + 12} // tile + gap
         decelerationRate="fast"
+        snapToInterval={108}
       >
         {CATEGORIES.map((cat) => {
           const Icon = cat.icon;
@@ -129,52 +82,41 @@ export function CategoriesTab({
               key={cat.id}
               onPress={() => onSelectCategory(cat.id)}
               style={({ pressed }) => [
-                { marginRight: 12 }, // space-x-3 = 12px
-                pressed && { transform: [{ scale: 0.98 }] },
+                styles.cardWrap,
+                pressed && { transform: [{ scale: 0.97 }] },
               ]}
             >
-              {/* web: w-[110px] h-[110px] flex-col justify-between p-3.5 rounded-2xl border */}
               <View
                 style={[
                   styles.tile,
-                  isSelected && {
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    borderColor: 'rgba(255,255,255,0.25)',
-                    transform: [{ scale: 1.03 }],
-                    shadowColor: cat.glow,
-                    shadowOpacity: 1,
-                    shadowRadius: 25,
-                    shadowOffset: { width: 0, height: 0 },
-                  },
-                  !isSelected && {
-                    opacity: 0.7,
-                  },
+                  isSelected && styles.tileActive,
                 ]}
               >
-                {/* Top row: icon + selection dot */}
                 <View style={styles.tileTop}>
-                  {/* web: p-1.5 rounded-xl bg-white/5 border border-white/10 */}
-                  <View style={styles.iconBox}>
-                    <Icon color={cat.color} size={16} strokeWidth={2} />
-                  </View>
-                  {isSelected && (
-                    // web: w-2 h-2 rounded-full shadow
-                    <View
-                      style={[
-                        styles.selDot,
-                        { backgroundColor: cat.bg },
-                      ]}
+                  <View
+                    style={[
+                      styles.iconBox,
+                      isSelected && styles.iconBoxActive,
+                    ]}
+                  >
+                    <Icon
+                      color={
+                        isSelected ? colors.bgCard : cat.color
+                      }
+                      size={16}
+                      strokeWidth={2}
                     />
-                  )}
+                  </View>
+                  {isSelected && <View style={styles.selDot} />}
                 </View>
 
-                {/* Bottom: label + count */}
-                <View>
-                  {/* web: font-display font-medium text-xs tracking-tight text-white mb-0.5 */}
-                  <Text style={styles.tileLabel} numberOfLines={1}>
-                    {cat.id === 'All' ? 'Vault (All)' : cat.id}
+                <View style={{ marginTop: 'auto' }}>
+                  <Text
+                    style={styles.tileLabel}
+                    numberOfLines={1}
+                  >
+                    {cat.label}
                   </Text>
-                  {/* web: font-mono text-[8px] text-gray-500 uppercase tracking-wider */}
                   <Text style={styles.tileCount}>
                     {count} {count === 1 ? 'ASSET' : 'ASSETS'}
                   </Text>
@@ -188,85 +130,94 @@ export function CategoriesTab({
   );
 }
 
-const TILE_SIZE = 110; // web: w-[110px] h-[110px]
+const TILE_WIDTH = 100;
+const TILE_HEIGHT = 104;
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 4, // py-1
-    gap: 16, // space-y-4
+    paddingTop: 2,
+    marginBottom: 16,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 4, // px-1
+    paddingHorizontal: 2,
+    marginBottom: 10,
   },
-  // web: text-[10px] uppercase font-display tracking-widest text-[#8A8A93]
   headerLabel: {
     fontSize: 10,
-    color: '#8A8A93',
-    letterSpacing: 2.5, // tracking-widest
+    color: colors.textPrimary,
+    letterSpacing: 1.8,
+    fontFamily: fonts.body,
+    fontWeight: '700',
   },
-  // web: font-mono text-[9px] text-[#8A8A93]
-  headerSub: {
-    fontSize: 9,
-    color: '#8A8A93',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  // web: pb-4 pt-1 px-1
   scrollContent: {
-    paddingHorizontal: 4,
-    paddingTop: 4,
-    paddingBottom: 16,
-    paddingRight: 4,
+    paddingRight: 8,
+    paddingVertical: 4,
   },
-  // web: w-[110px] h-[110px] p-3.5 rounded-2xl border bg-white/3 border-white/5
+  cardWrap: {
+    width: TILE_WIDTH,
+    height: TILE_HEIGHT,
+    marginRight: 8,
+  },
   tile: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    flex: 1,
+    backgroundColor: colors.glassBgStrong,
     borderRadius: 16,
-    padding: 14, // p-3.5 = 14px
+    padding: 10,
+    borderWidth: 1.5,
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
     justifyContent: 'space-between',
+  },
+  tileActive: {
+    borderColor: colors.borderActive,
+    shadowColor: colors.accentCoral,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   tileTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  // web: p-1.5 rounded-xl bg-white/5 border border-white/10
   iconBox: {
-    padding: 6, // p-1.5
-    borderRadius: 12, // rounded-xl
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: colors.glassBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  // web: w-2 h-2 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)]
+  iconBoxActive: {
+    backgroundColor: colors.accentCoral,
+    borderColor: colors.accentCoral,
+  },
   selDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    shadowColor: '#FFFFFF',
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.textPrimary,
   },
-  // web: font-display font-medium text-xs tracking-tight mb-0.5
   tileLabel: {
-    fontSize: 12, // text-xs
-    fontWeight: '500',
+    fontSize: 10.5,
+    fontFamily: fonts.body,
     color: colors.textPrimary,
-    letterSpacing: -0.5, // tracking-tight
-    marginBottom: 2,
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
-  // web: font-mono text-[8px] text-gray-500 uppercase tracking-wider
   tileCount: {
     fontSize: 8,
-    color: '#6B7280', // text-gray-500
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    letterSpacing: 1.0, // tracking-wider
-    textTransform: 'uppercase',
+    color: colors.textSecondary,
+    fontFamily: fonts.mono,
+    letterSpacing: 0.6,
+    marginTop: 1,
   },
 });

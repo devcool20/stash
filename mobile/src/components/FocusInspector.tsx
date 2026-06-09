@@ -32,9 +32,8 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
-import { GlassPanel } from './GlassPanel';
 import { StashItem, CategoryKey } from '../types';
-import { colors, radii } from '../theme/colors';
+import { colors, fonts, radii } from '../theme/colors';
 
 interface FocusInspectorProps {
   item: StashItem | null;
@@ -87,6 +86,11 @@ export function FocusInspector({
     }
   };
 
+  const formattedDate = new Date(item.createdAt).toLocaleDateString(
+    undefined,
+    { day: 'numeric', month: 'short' },
+  );
+
   return (
     <Modal
       visible={visible}
@@ -103,44 +107,32 @@ export function FocusInspector({
           exiting={SlideOutDown.duration(180)}
           style={styles.sheet}
         >
-          <GlassPanel
-            variant="base"
-            borderRadius={28}
-            intensity={42}
-            style={styles.sheetPanel}
-          >
-            {/* Grab handle */}
-            <View style={styles.handleRow}>
-              <View style={styles.handle} />
+          <View style={styles.sheetPanel}>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.headerLeft}>
+                <Text style={styles.title} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <Text style={styles.sub}>
+                  VAULT · {item.category.toUpperCase()} · {formattedDate}
+                </Text>
+              </View>
+              <Pressable
+                onPress={onClose}
+                style={({ pressed }) => [
+                  styles.closeBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={styles.closeBtnText}>CLOSE</Text>
+              </Pressable>
             </View>
 
             <ScrollView
               contentContainerStyle={styles.scroll}
               showsVerticalScrollIndicator={false}
             >
-              {/* Header */}
-              <View style={styles.header}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.sub}>
-                    STASH · {item.category} ·{' '}
-                    {new Date(item.createdAt).toLocaleDateString(undefined, {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={onClose}
-                  style={({ pressed }) => [
-                    styles.closeBtn,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <Text style={styles.closeBtnText}>CLOSE</Text>
-                </Pressable>
-              </View>
-
               {/* Hero image */}
               <View style={styles.heroWrap}>
                 <Image
@@ -160,27 +152,44 @@ export function FocusInspector({
                   ]}
                 >
                   {isZoomed ? (
-                    <ZoomOut color="#FFFFFF" size={10} strokeWidth={2.2} />
+                    <ZoomOut
+                      color={colors.textPrimary}
+                      size={10}
+                      strokeWidth={2.4}
+                    />
                   ) : (
-                    <ZoomIn color="#FFFFFF" size={10} strokeWidth={2.2} />
+                    <ZoomIn
+                      color={colors.textPrimary}
+                      size={10}
+                      strokeWidth={2.4}
+                    />
                   )}
                   <Text style={styles.zoomText}>
                     {isZoomed ? 'ZOOM OUT' : 'PINCH TO ZOOM'}
                   </Text>
                 </Pressable>
-                {item.description && (
-                  <View style={styles.heroDesc}>
-                    <Text style={styles.heroDescText} numberOfLines={2}>
+              </View>
+
+              {/* Description Section */}
+              {item.description && (
+                <View style={{ gap: 6, marginTop: 18 }}>
+                  <Text style={styles.label}>
+                    ABOUT THIS IMAGE
+                  </Text>
+                  <View style={styles.descPanel}>
+                    <Text style={styles.descText}>
                       {item.description}
                     </Text>
                   </View>
-                )}
-              </View>
+                </View>
+              )}
 
               {/* Source URL pill */}
               {item.sourceUrl && (
-                <View style={{ gap: 6 }}>
-                  <Text style={styles.label}>ORIGIN LINK NETWORK</Text>
+                <View style={{ gap: 6, marginTop: 18 }}>
+                  <Text style={styles.label}>
+                    ORIGINAL WEBSITE LINK
+                  </Text>
                   <Pressable
                     onPress={() => Linking.openURL(item.sourceUrl!)}
                     style={({ pressed }) => [
@@ -188,28 +197,33 @@ export function FocusInspector({
                       pressed && { opacity: 0.85 },
                     ]}
                   >
-                    <Image
-                      source={{
-                        uri:
-                          item.favicon ||
-                          `https://www.google.com/s2/favicons?sz=64&domain=${
-                            item.sourceUrl
-                              .replace(/^https?:\/\//i, '')
-                              .split('/')[0]
-                          }`,
-                      }}
-                      style={styles.favicon}
-                      resizeMode="contain"
-                    />
+                    <View style={styles.sourceIconBox}>
+                      <Image
+                        source={{
+                          uri:
+                            item.favicon ||
+                            `https://www.google.com/s2/favicons?sz=64&domain=${
+                              item.sourceUrl
+                                .replace(/^https?:\/\//i, '')
+                                .split('/')[0]
+                            }`,
+                        }}
+                        style={styles.favicon}
+                        resizeMode="contain"
+                      />
+                    </View>
                     <Text
                       style={styles.sourceText}
                       numberOfLines={1}
                     >
-                      {item.sourceUrl.replace(/^https?:\/\/(www\.)?/i, '')}
+                      {item.sourceUrl.replace(
+                        /^https?:\/\/(www\.)?/i,
+                        '',
+                      )}
                     </Text>
                     <ExternalLink
                       color={colors.textSecondary}
-                      size={10}
+                      size={11}
                       strokeWidth={2}
                     />
                   </Pressable>
@@ -217,13 +231,13 @@ export function FocusInspector({
               )}
 
               {/* OCR Accordion */}
-              <View style={{ gap: 8 }}>
+              <View style={{ gap: 8, marginTop: 18 }}>
                 <Pressable
                   onPress={() => setIsOcrOpen(!isOcrOpen)}
                   style={styles.accordionHead}
                 >
                   <Text style={styles.label}>
-                    EXTRACTED ALPHANUMERIC TEXT
+                    SCANNED TEXT IN IMAGE
                   </Text>
                   {isOcrOpen ? (
                     <ChevronUp
@@ -245,47 +259,48 @@ export function FocusInspector({
                     entering={FadeIn.duration(150)}
                     exiting={FadeOut.duration(120)}
                   >
-                    <GlassPanel
-                      variant="base"
-                      borderRadius={12}
-                      intensity={20}
-                      style={styles.ocrPanel}
-                    >
+                    <View style={styles.ocrPanel}>
                       <ScrollView
                         style={{ maxHeight: 160 }}
                         showsVerticalScrollIndicator
                       >
                         <Text style={styles.ocrText} selectable>
                           {item.extractedText ||
-                            '[NO TEXT CLIPPINGS RECORDED - OCR NOT TRIGGERED]'}
+                            'No text scanned in this image.'}
                         </Text>
                       </ScrollView>
-                      <Pressable
-                        onPress={handleCopy}
-                        style={({ pressed }) => [
-                          styles.copyBtn,
-                          pressed && { transform: [{ scale: 0.96 }] },
-                        ]}
-                      >
-                        {copied ? (
-                          <Check
-                            color={colors.emeraldDeep}
-                            size={11}
-                            strokeWidth={2.4}
-                          />
-                        ) : (
-                          <Copy color="#000" size={11} strokeWidth={2.4} />
-                        )}
-                        <Text style={styles.copyText}>
-                          {copied ? 'COPIED TO CLIPBOARD' : 'COPY ALL'}
-                        </Text>
-                      </Pressable>
-                    </GlassPanel>
+                      <View style={styles.copyRow}>
+                        <Pressable
+                          onPress={handleCopy}
+                          style={({ pressed }) => [
+                            styles.copyBtn,
+                            pressed && { transform: [{ scale: 0.96 }] },
+                          ]}
+                        >
+                          {copied ? (
+                            <Check
+                              color={colors.bg}
+                              size={11}
+                              strokeWidth={2.4}
+                            />
+                          ) : (
+                            <Copy
+                              color={colors.bg}
+                              size={11}
+                              strokeWidth={2.4}
+                            />
+                          )}
+                          <Text style={styles.copyText}>
+                            {copied ? 'COPIED' : 'COPY ALL'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
                   </Animated.View>
                 )}
               </View>
 
-              <View style={{ height: 80 }} />
+              <View style={{ height: 110 }} />
             </ScrollView>
 
             {/* Bottom action bar */}
@@ -298,8 +313,10 @@ export function FocusInspector({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Trash2 color={colors.red} size={11} strokeWidth={2} />
-                <Text style={[styles.actionText, { color: colors.red }]}>
+                <Trash2 color={colors.accentCoral} size={12} strokeWidth={2} />
+                <Text
+                  style={[styles.actionText, { color: colors.accentCoral }]}
+                >
                   DELETE
                 </Text>
               </Pressable>
@@ -315,10 +332,10 @@ export function FocusInspector({
                 >
                   <FolderSync
                     color={colors.textPrimary}
-                    size={11}
+                    size={12}
                     strokeWidth={2}
                   />
-                  <Text style={styles.actionText}>REGROUP</Text>
+                  <Text style={styles.actionText}>MOVE</Text>
                 </Pressable>
 
                 {showRegroupMenu && (
@@ -327,7 +344,7 @@ export function FocusInspector({
                     style={styles.regroupMenu}
                   >
                     <Text style={styles.regroupLabel}>
-                      REASSIGN CATEGORY LENS
+                      SELECT CATEGORY
                     </Text>
                     {CATEGORIES.map((cat) => (
                       <Pressable
@@ -338,7 +355,8 @@ export function FocusInspector({
                         }}
                         style={({ pressed }) => [
                           styles.regroupItem,
-                          item.category === cat && styles.regroupItemActive,
+                          item.category === cat &&
+                            styles.regroupItemActive,
                           pressed && { opacity: 0.85 },
                         ]}
                       >
@@ -346,7 +364,7 @@ export function FocusInspector({
                           style={[
                             styles.regroupItemText,
                             item.category === cat && {
-                              color: '#000',
+                              color: colors.textOnDark,
                               fontWeight: '600',
                             },
                           ]}
@@ -367,11 +385,15 @@ export function FocusInspector({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Share2 color={colors.textPrimary} size={11} strokeWidth={2} />
+                <Share2
+                  color={colors.textPrimary}
+                  size={12}
+                  strokeWidth={2}
+                />
                 <Text style={styles.actionText}>SHARE</Text>
               </Pressable>
             </View>
-          </GlassPanel>
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -381,74 +403,94 @@ export function FocusInspector({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: colors.overlayDim,
     justifyContent: 'flex-end',
   },
   sheet: {
-    height: '88%',
+    height: '92%',
     width: '100%',
   },
   sheetPanel: {
     flex: 1,
     overflow: 'hidden',
-  },
-  handleRow: {
-    width: '100%',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  handle: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  scroll: {
-    paddingHorizontal: 22,
-    paddingBottom: 24,
-    gap: 18,
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 1,
+    shadowRadius: 24,
+    elevation: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 14,
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+  },
+  headerLeft: {
+    flex: 1,
+    paddingRight: 12,
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: -0.4,
-    lineHeight: 22,
+    fontFamily: fonts.display,
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+    lineHeight: 26,
   },
   sub: {
     color: colors.textSecondary,
     fontSize: 10,
-    fontStyle: 'italic',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: fonts.mono,
     letterSpacing: 0.5,
-    marginTop: 4,
+    marginTop: 6,
   },
   closeBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glassBgStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
   },
   closeBtnText: {
-    color: colors.textSecondary,
-    fontSize: 9,
-    fontWeight: '500',
-    letterSpacing: 1,
+    color: colors.textPrimary,
+    fontSize: 9.5,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+  },
+  scroll: {
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 24,
   },
   heroWrap: {
-    aspectRatio: 16 / 9,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 16,
+    aspectRatio: 16 / 10,
+    backgroundColor: colors.bgCard,
+    borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.borderSubtle,
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 3,
   },
   heroImg: {
     width: '100%',
@@ -456,54 +498,84 @@ const styles = StyleSheet.create({
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.0)',
+    backgroundColor: 'transparent',
   },
   zoomBtn: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 12,
+    right: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.glassBgStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: colors.glassBorder,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
   },
   zoomText: {
     color: colors.textPrimary,
-    fontSize: 8,
+    fontSize: 8.5,
     letterSpacing: 1,
-    fontWeight: '500',
+    fontFamily: fonts.body,
+    fontWeight: '700',
   },
-  heroDesc: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    right: 10,
+  descPanel: {
+    backgroundColor: colors.glassBgStrong,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  heroDescText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    lineHeight: 14,
+  descText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.body,
+    fontSize: 12,
+    lineHeight: 18,
   },
   label: {
-    color: colors.textSecondary,
-    fontSize: 9,
-    letterSpacing: 1.5,
+    color: colors.textPrimary,
+    fontSize: 9.5,
+    letterSpacing: 1.4,
+    fontFamily: fonts.body,
+    fontWeight: '700',
   },
   sourcePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glassBgStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 999,
-    paddingVertical: 7,
+    borderColor: colors.glassBorder,
+    borderRadius: 14,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    gap: 6,
+    gap: 8,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  sourceIconBox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    backgroundColor: colors.glassBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   favicon: {
     width: 12,
@@ -512,43 +584,57 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     color: colors.textPrimary,
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontFamily: fonts.mono,
     flex: 1,
   },
   accordionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: colors.borderSubtle,
   },
   ocrPanel: {
-    padding: 12,
+    backgroundColor: colors.glassBgStrong,
+    borderRadius: 16,
+    padding: 14,
     gap: 12,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
   },
   ocrText: {
     color: colors.textPrimary,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontFamily: fonts.mono,
     fontSize: 10.5,
     lineHeight: 16,
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   copyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: colors.textPrimary,
     borderRadius: 999,
-    gap: 4,
+    gap: 5,
   },
   copyText: {
-    color: '#000000',
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 1,
+    color: colors.bg,
+    fontSize: 9.5,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
   actionBar: {
     position: 'absolute',
@@ -556,67 +642,82 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
+    paddingBottom: 22,
     flexDirection: 'row',
     gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: colors.bg,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: colors.borderSubtle,
   },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 999,
     gap: 5,
   },
   actionText: {
     color: colors.textPrimary,
-    fontSize: 8.5,
-    fontWeight: '600',
-    letterSpacing: 1,
+    fontSize: 9.5,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
   deleteBtn: {
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
-    backgroundColor: 'rgba(127,29,29,0.1)',
+    borderWidth: 1.5,
+    borderColor: colors.accentCoral,
+    backgroundColor: colors.accentCoralSoft,
   },
   regroupBtn: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1.5,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glassBgStrong,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
   },
   regroupMenu: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 56,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(10,10,12,0.95)',
-    borderRadius: 14,
+    backgroundColor: colors.glassBgStrong,
+    borderRadius: 16,
     padding: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glassBorder,
     gap: 2,
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   regroupLabel: {
-    fontSize: 7.5,
-    color: colors.textMuted,
+    fontSize: 8,
+    color: colors.textSecondary,
     letterSpacing: 1.2,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   regroupItem: {
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   regroupItemActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.textPrimary,
   },
   regroupItemText: {
-    color: colors.textSecondary,
+    color: colors.textPrimary,
     fontSize: 10.5,
+    fontFamily: fonts.body,
     fontWeight: '500',
     letterSpacing: 0.3,
   },

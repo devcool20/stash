@@ -7,12 +7,11 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Inbox, Info } from 'lucide-react-native';
 import { db } from '../database';
 import { StashItem } from '../types';
 import { MasonryGrid } from '../components/MasonryGrid';
-import { colors } from '../theme/colors';
+import { colors, fonts } from '../theme/colors';
 
 interface StashScreenProps {
   items: StashItem[];
@@ -29,7 +28,6 @@ export function StashScreen({
 }: StashScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [filtered, setFiltered] = useState<StashItem[]>([]);
-
   useEffect(() => {
     const run = async () => {
       let dataset = searchQuery.trim()
@@ -51,17 +49,14 @@ export function StashScreen({
 
   if (items.length === 0) {
     return (
-      // web: text-center py-16 bg-white/[0.01] border border-white/5 rounded-2xl p-6
       <View style={styles.empty}>
         <Inbox
-          color={colors.textMuted}
-          size={32}
+          color={colors.textSecondary}
+          size={28}
           strokeWidth={1.4}
           style={{ marginBottom: 8 }}
         />
-        {/* web: font-display font-medium text-xs text-white */}
-        <Text style={styles.emptyTitle}>Inbox is Vacant</Text>
-        {/* web: text-[10px] text-gray-500 font-sans mt-0.5 */}
+        <Text style={styles.emptyTitle}>INBOX IS VACANT</Text>
         <Text style={styles.emptyDesc}>
           Tap the plus symbol to scan resources
         </Text>
@@ -69,48 +64,45 @@ export function StashScreen({
     );
   }
 
-  if (filtered.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <Info
-          color={colors.textMuted}
-          size={20}
-          strokeWidth={1.6}
-          style={{ marginBottom: 6 }}
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.textSecondary}
         />
-        <Text style={styles.noResults}>
-          NO RESULTS KEY "{searchQuery.toUpperCase()}"
+      }
+    >
+      <View style={styles.groupHeader}>
+        <Text style={styles.groupHeaderLabel}>
+          ALL STASH
+        </Text>
+        <Text style={styles.groupHeaderCount}>
+          {filtered.length} {filtered.length === 1 ? 'ELEMENT' : 'ELEMENTS'}
         </Text>
       </View>
-    );
-  }
 
-  return (
-    <View style={{ flex: 1 }}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.textSecondary}
+      {filtered.length === 0 ? (
+        <View style={styles.empty}>
+          <Info
+            color={colors.textSecondary}
+            size={18}
+            strokeWidth={1.6}
+            style={{ marginBottom: 6 }}
           />
-        }
-      >
+          <Text style={styles.noResults}>
+            NO RESULTS KEY "{searchQuery.toUpperCase()}"
+          </Text>
+        </View>
+      ) : (
         <MasonryGrid items={filtered} onItemClick={onItemClick} />
-        {/* Visual grid bottom spacing padding */}
-        <View style={{ height: 80 }} />
-      </ScrollView>
+      )}
 
-      {/* Bottom Fade Mask: matches web linear-gradient(to top, #000000, rgba(0,0,0,0)) */}
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.95)']}
-        locations={[0, 1]}
-        style={styles.bottomFade}
-        pointerEvents="none"
-      />
-    </View>
+      <View style={{ height: 110 }} />
+    </ScrollView>
   );
 }
 
@@ -118,38 +110,55 @@ const styles = StyleSheet.create({
   scroll: {
     paddingTop: 4,
   },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+    marginBottom: 12,
+  },
+  groupHeaderLabel: {
+    fontSize: 9.5,
+    color: colors.textPrimary,
+    letterSpacing: 1.4,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+  },
+  groupHeaderCount: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    fontFamily: fonts.mono,
+    letterSpacing: 0.5,
+  },
   empty: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 64, // py-16
-    backgroundColor: 'rgba(255,255,255,0.01)', // bg-white/[0.01]
-    borderRadius: 16,
+    paddingVertical: 50,
+    backgroundColor: colors.glassBgStrong,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    padding: 24,
+    borderColor: colors.glassBorder,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 1,
   },
   emptyTitle: {
     color: colors.textPrimary,
-    fontSize: 12, // text-xs
-    fontWeight: '500',
-    letterSpacing: -0.2,
+    fontSize: 10.5,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   emptyDesc: {
-    color: '#6B7280', // text-gray-500
-    fontSize: 10, // text-[10px]
-    marginTop: 2,
+    color: colors.textSecondary,
+    fontSize: 9,
+    marginTop: 4,
   },
   noResults: {
-    color: '#9CA3AF', // text-gray-400
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  // Bottom gradient fade mask overlay
-  bottomFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 80,
+    color: colors.textSecondary,
+    fontSize: 9,
+    fontFamily: fonts.mono,
   },
 });

@@ -90,6 +90,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
       let finalSource = tempItem.sourceUrl || '';
       let finalFavicon = '';
       let finalOcr = '';
+      let ocrData: any = null;
 
       if (type === 'link') {
         setPipelineProgress('METADATA HYDRATION PARSER (400ms)... Gathering OpenGraph tags from site');
@@ -120,12 +121,12 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         });
         
         if (!res.ok) throw new Error('OCR core timeout.');
-        const ocrData = await res.json();
+        ocrData = await res.json();
         
         finalOcr = ocrData.text || '';
         finalTitle = sourceData.title || 'Extracted Screenshot';
-        finalDesc = finalOcr ? finalOcr.substring(0, 100) + '...' : 'Extracted screenshot visual elements';
-        finalImg = sourceData.imageBase64 || '';
+        finalDesc = ocrData.summary || (finalOcr ? finalOcr.substring(0, 100) + '...' : 'Extracted screenshot visual elements');
+        finalImg = ocrData.imageUrl || sourceData.imageBase64 || '';
       }
 
       await new Promise(r => setTimeout(r, 600));
@@ -133,19 +134,23 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
       setPipelineProgress('FTS5 TOKEN INDEXING (220ms)... tokenizing keywords, status="ready" on-device sync completed');
 
       // Smart auto-categorize using indexed dictionary rules
-      const combinedText = `${finalTitle} ${finalDesc} ${finalOcr}`.toLowerCase();
       let autoCategory: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design' = 'Design';
       
-      if (combinedText.includes('poached') || combinedText.includes('egg') || combinedText.includes('brunch') || combinedText.includes('recipe') || combinedText.includes('food')) {
-        autoCategory = 'Recipes';
-      } else if (combinedText.includes('mount') || combinedText.includes('valley') || combinedText.includes('travel') || combinedText.includes('trip') || combinedText.includes('hiking')) {
-        autoCategory = 'Travel';
-      } else if (combinedText.includes('cotton') || combinedText.includes('cotton') || combinedText.includes('shirting') || combinedText.includes('wear') || combinedText.includes('price') || combinedText.includes('buy') || combinedText.includes('watch') || combinedText.includes('luxur')) {
-        autoCategory = 'Shopping';
-      } else if (combinedText.includes('theory') || combinedText.includes('sovereignty') || combinedText.includes('read') || combinedText.includes('article')) {
-        autoCategory = 'Articles';
-      } else if (type === 'image') {
-        autoCategory = 'Design';
+      if (ocrData?.category && ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'].includes(ocrData.category)) {
+        autoCategory = ocrData.category;
+      } else {
+        const combinedText = `${finalTitle} ${finalDesc} ${finalOcr}`.toLowerCase();
+        if (combinedText.includes('poached') || combinedText.includes('egg') || combinedText.includes('brunch') || combinedText.includes('recipe') || combinedText.includes('food')) {
+          autoCategory = 'Recipes';
+        } else if (combinedText.includes('mount') || combinedText.includes('valley') || combinedText.includes('travel') || combinedText.includes('trip') || combinedText.includes('hiking')) {
+          autoCategory = 'Travel';
+        } else if (combinedText.includes('cotton') || combinedText.includes('cotton') || combinedText.includes('shirting') || combinedText.includes('wear') || combinedText.includes('price') || combinedText.includes('buy') || combinedText.includes('watch') || combinedText.includes('luxur')) {
+          autoCategory = 'Shopping';
+        } else if (combinedText.includes('theory') || combinedText.includes('sovereignty') || combinedText.includes('read') || combinedText.includes('article')) {
+          autoCategory = 'Articles';
+        } else if (type === 'image') {
+          autoCategory = 'Design';
+        }
       }
 
       // Update the indexed temporary asset in localStorage database
@@ -157,6 +162,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         favicon: finalFavicon,
         category: autoCategory,
         extractedText: finalOcr || `METADATA HYDRATION: Link established with ${finalSource}. Saved tags: ${finalTitle}.`,
+        summary: ocrData?.summary || '',
         status: 'ready'
       });
 

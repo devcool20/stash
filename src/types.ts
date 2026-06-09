@@ -8,6 +8,7 @@ export interface StashItem {
   favicon?: string;
   category: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design';
   extractedText?: string;
+  summary?: string;
   status: 'processing' | 'ready';
   createdAt: string;
 }

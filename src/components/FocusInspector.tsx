@@ -74,7 +74,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
                 {item.title}
               </h3>
               <p className="text-xs text-[#8A8A93] italic mt-1 uppercase font-mono tracking-wider">
-                STASH • {item.category} • {new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                VAULT • {item.category} • {new Date(item.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
               </p>
             </div>
             <button 
@@ -109,20 +109,22 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
               <ZoomIn className="w-3 h-3 text-white" />
               <span>{isZoomed ? 'ZOOM OUT' : 'PINCH TO ZOOM'}</span>
             </button>
-
-            {item.description && (
-              <div className="absolute bottom-4 left-4 right-4">
-                <p id="item-description-text" className="text-white text-xs leading-relaxed line-clamp-2">
-                  {item.description}
-                </p>
-              </div>
-            )}
           </div>
+
+          {/* Description Section */}
+          {item.description && (
+            <div className="space-y-1.5">
+              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">ABOUT THIS IMAGE</span>
+              <div className="glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 text-xs text-white leading-relaxed">
+                {item.description}
+              </div>
+            </div>
+          )}
 
           {/* Source Link indicator */}
           {item.sourceUrl && (
             <div className="space-y-1.5">
-              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">ORIGIN LINK NETWORK</span>
+              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">ORIGINAL WEBSITE LINK</span>
               <div>
                 <a
                   href={item.sourceUrl}
@@ -153,7 +155,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
               id="toggle-ocr-accordion"
               className="w-full flex items-center justify-between py-2 border-b border-white/5 cursor-pointer outline-none"
             >
-              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">EXTRACTED ALPHANUMERIC TEXT</span>
+              <span className="text-[10px] uppercase font-display tracking-widest text-[#8A8A93]">SCANNED TEXT IN IMAGE</span>
               {isOcrOpen ? <ChevronUp className="w-4 h-4 text-[#8A8A93]" /> : <ChevronDown className="w-4 h-4 text-[#8A8A93]" />}
             </button>
 
@@ -167,7 +169,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
                 >
                   <div id="ocr-monospace" className="glass-panel-base rounded-xl bg-black/40 border border-white/5 p-4 relative space-y-4">
                     <p className="font-mono text-xs text-white leading-relaxed tracking-wide select-text whitespace-pre-wrap max-h-48 overflow-y-auto pr-1">
-                      {item.extractedText || '[NO TEXT CLIPPINGS RECORDED - OCR NOT TRIGGERED]'}
+                      {item.extractedText || 'No text scanned in this image.'}
                     </p>
 
                     <button
@@ -204,7 +206,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
               className="w-full py-3 px-4 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white font-display uppercase tracking-widest text-[9px] font-semibold flex items-center justify-center space-x-1.5 transition-all cursor-pointer active:scale-95 select-none"
             >
               <FolderSync className="w-3.5 h-3.5 text-white animate-pulse" />
-              <span>Regroup</span>
+              <span>Move</span>
             </button>
 
             <AnimatePresence>
@@ -216,7 +218,7 @@ export default function FocusInspector({ item, onClose, onDelete, onRegroup }: F
                   id="regroup-menu-dropdown"
                   className="absolute bottom-full left-0 right-0 mb-3 bg-[#0a0a0c]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl space-y-1 z-30"
                 >
-                  <span className="block text-[8px] tracking-widest font-display text-gray-500 uppercase px-3 py-1.5">REASSIGN CATEGORY LENS</span>
+                  <span className="block text-[8px] tracking-widest font-display text-gray-500 uppercase px-3 py-1.5">SELECT CATEGORY</span>
                   {categories.map((cat) => (
                     <button
                       key={cat}
