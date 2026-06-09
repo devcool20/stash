@@ -1,8 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -13,24 +13,18 @@ const PORT = 3000;
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Shared Gemini Client Server-Side Setup with standard builder telemetry headers
-let ai: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  try {
-    ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
-    console.log('Gemini GenAI client successfully initialized server-side.');
-  } catch (err) {
-    console.error('Error during Gemini SDK initialization:', err);
-  }
+// Set up uploads directory for image hosting
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+let hasApiKey = !!process.env.GROQ_API_KEY;
+if (hasApiKey) {
+  console.log('Groq API key found — cloud vision OCR enabled (Llama 4 Scout).');
 } else {
-  console.warn('GEMINI_API_KEY is not defined. The OCR system will leverage local layout OCR simulation.');
+  console.warn('GROQ_API_KEY not set. OCR will return mock responses.');
 }
 
 // 1. API Endpoint: Metadata Hydration Parser
@@ -117,102 +111,390 @@ app.get('/api/metadata', async (req, res) => {
   }
 });
 
-// 2. API Endpoint: On-Device Gemini OCR and Rich Context Engine
-// Leverages server-side Gemini 3.5-flash model to analyze uploaded screenshot base64 strings and extract structured metadata
+// 2. API Endpoint: Vision OCR & Image Analysis
+// Uses Groq's Llama 4 Scout Vision API to extract OCR text,
+// generate a one-line visual summary for search, and classify content.
 app.post('/api/ocr', async (req, res) => {
+  console.log('\n--- [/api/ocr] Received image processing request ---');
   const { base64, mimeType } = req.body;
   if (!base64) {
+    console.error('[/api/ocr] Error: Missing base64 data payload');
     return res.status(400).json({ error: 'Missing base64 data payload' });
   }
 
   const cleanMimeType = mimeType || 'image/png';
-  
-  if (ai) {
-    try {
-      const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [
-          {
-            inlineData: {
-              data: rawBase64,
-              mimeType: cleanMimeType,
-            },
-          },
-          {
-            text: `Analyze this screenshot or image. Perform comprehensive OCR and image understanding.
-You must return a structured JSON object with the following fields:
-- "text": The complete raw extracted OCR text from the image, preserving sentences.
-- "title": A smart, premium, descriptive title of what the screenshot is of (e.g. "Green Midi Dress" or "Hakone Onsen Stay").
-- "description": A genuine, detailed, context-aware description explaining exactly what is pictured in the screenshot (not just related to it, but a description of it).
-- "category": One of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom recommended folder name (like "Fashion" or "Fitness") if it fits the visual content perfectly.
-- "tags": An array of 3-5 relevant semantic tags extracted from the image.
+  const apiKey = process.env.GROQ_API_KEY;
 
-Return ONLY the raw JSON object conforming to this schema.`,
-          }
-        ],
-        config: {
-          responseMimeType: 'application/json'
-        }
-      });
+  // Save base64 image locally to be served statically
+  let hostedImageUrl = '';
+  try {
+    const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+    const filename = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`;
+    const filepath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filepath, rawBase64, 'base64');
+    
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    hostedImageUrl = `${protocol}://${host}/uploads/${filename}`;
+    console.log(`[/api/ocr] Saved image locally. Public hosted URL: ${hostedImageUrl}`);
+  } catch (uploadErr) {
+    console.error('[/api/ocr] Failed to save uploaded image locally:', uploadErr);
+  }
 
-      const jsonText = response.text ? response.text.trim() : '{}';
-      const parsedData = JSON.parse(jsonText);
-      return res.json({
-        text: parsedData.text || '',
-        title: parsedData.title || 'Analyzed Screenshot',
-        description: parsedData.description || 'Extracted screenshot visual elements',
-        category: parsedData.category || 'Design',
-        tags: parsedData.tags || []
-      });
-
-    } catch (err: any) {
-      console.error('Gemini OCR runtime call failed:', err);
-      return res.json({
-        text: 'FALLBACK SCRAP: [CRITICAL EXCEPTION] OCR pipeline encountered a timeout.',
-        title: 'Timeout Fallback Node',
-        description: 'Pipeline encountered a timeout during processing.',
-        category: 'Design',
-        tags: ['fallback'],
-        error: err.message
-      });
-    }
-  } else {
-    // Elegant client simulated structured response if server key is not entered
+  if (!apiKey) {
+    console.log('[/api/ocr] Warning: GROQ_API_KEY is not set in environment. Using fallback mock response.');
     const mockOCRResponses = [
       {
         text: 'AUTHENTIC PREMIUM LOOKS FOR MEN & WOMEN\nDESIGNED IN BALENCIAGA PARIS STUDS\nPRICE: €1200.00\nSIZE: EXTRA LARGE\nPOSTED: 3 HOURS AGO\nTAGS: #FASHION #DESIGN',
         title: 'Balenciaga Studio Preview',
+        summary: 'A product page for Balenciaga studded fashion items for men and women.',
         description: 'Product listing page showing Balenciaga Paris studs for men and women.',
         category: 'Shopping',
-        tags: ['fashion', 'balenciaga', 'design']
+        tags: ['fashion', 'balenciaga', 'design'],
+        imageUrl: hostedImageUrl
       },
       {
         text: 'INGREDIENTS LIST:\n- 4 ORGANIC EGGS\n- 1 CUP UNSTABILIZED HOLLANDAISE\n- CHIVES & CURED DUCK THIGHS\n- WILD SOURDOUGH LOAF\nBON APPETIT MAG.',
         title: 'Sunday Brunch Benedict Recipe',
+        summary: 'A recipe card for eggs benedict with hollandaise and duck confit.',
         description: 'Ingredients card for a slow Sunday brunch showing eggs benedict on sourdough.',
         category: 'Recipes',
-        tags: ['brunch', 'recipe', 'cooking']
+        tags: ['brunch', 'recipe', 'cooking'],
+        imageUrl: hostedImageUrl
       },
       {
         text: 'SOMA STRETCH ARMCHAIR OAKEN WOODS\nMATERIAL: BOUCHÉ TEXTURED\nDESIGNER ID: WEGNER-284\nRETAIL: $4,250',
         title: 'Soma Oak Chair Specs',
+        summary: 'A spec sheet for a Soma oaken armchair with bouché fabric.',
         description: 'Spec sheet for a Soma oaken stretch armchair with bouché fabric.',
         category: 'Design',
-        tags: ['furniture', 'interior', 'designer']
+        tags: ['furniture', 'interior', 'designer'],
+        imageUrl: hostedImageUrl
       },
       {
         text: 'FLUID CYAN GRADIENTS STUDIES MAPPED\nSPLINE SHADER S3D - COMPOSITING\nREACTION RATIO: 16MS\nCREATED AT DEV-STASH LABS',
         title: 'Cyan Fluid Spline compositing',
+        summary: 'A 3D gradient shader study rendered in Spline.',
         description: 'Gradients visual study render with Spline 3D compositing shaders.',
         category: 'Design',
-        tags: ['compositing', 'spline', 'shader']
+        tags: ['compositing', 'spline', 'shader'],
+        imageUrl: hostedImageUrl
       }
     ];
     const randomIndex = Math.floor(Math.random() * mockOCRResponses.length);
+    console.log('[/api/ocr] Returned mock response:', mockOCRResponses[randomIndex].title);
     return res.json(mockOCRResponses[randomIndex]);
   }
+
+  const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  console.log('[/api/ocr] GROQ_API_KEY is active. Preparing request for meta-llama/llama-4-scout-17b-16e-instruct...');
+
+  try {
+    const rawBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+    console.log(`[/api/ocr] Image base64 payload size: ${(rawBase64.length / 1024).toFixed(1)} KB`);
+
+    const requestBody = {
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${cleanMimeType};base64,${rawBase64}` }
+            },
+            {
+              type: 'text',
+              text: `Analyze this image in detail. Return a JSON object with these fields:
+- "text": any visible text extracted from the image (empty string if none).
+- "title": a short descriptive title (max 6 words).
+- "summary": ONE short sentence describing what this image visually shows (used for search queries).
+- "description": a 1-2 sentence detailed description of what is pictured.
+- "category": one of "Shopping", "Recipes", "Travel", "Articles", "Design", or a custom one that fits.
+- "tags": 3-5 single-word tags describing the image content.
+
+Return ONLY valid JSON.`
+            }
+          ]
+        }
+      ],
+      max_tokens: 1000,
+      temperature: 0.1
+    };
+
+    console.log('[/api/ocr] Dispatching fetch request to Groq API completions endpoint...');
+    const apiRes = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!apiRes.ok) {
+      const errBody = await apiRes.text();
+      console.error('[/api/ocr] Groq API returned failure status:', apiRes.status, errBody);
+      return res.status(502).json({
+        error: 'Cloud vision model is currently unavailable. Try again later.'
+      });
+    }
+
+    const data = await apiRes.json();
+    const raw = data?.choices?.[0]?.message?.content;
+    console.log('[/api/ocr] Received response from Groq. Raw content:\n', raw);
+
+    if (!raw) {
+      console.error('[/api/ocr] Error: Groq returned response choices with empty message content.');
+      return res.status(502).json({ error: 'Empty message response from Groq.' });
+    }
+
+    const jsonText = raw.trim();
+    let parsed;
+
+    try {
+      // Robust JSON extraction using brace matching
+      const firstBrace = jsonText.indexOf('{');
+      const lastBrace = jsonText.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const jsonContent = jsonText.substring(firstBrace, lastBrace + 1);
+        parsed = JSON.parse(jsonContent);
+      } else {
+        const cleaned = jsonText.replace(/^```(?:json)?\s*|```\s*$/gi, '').trim();
+        parsed = JSON.parse(cleaned);
+      }
+    } catch (parseErr) {
+      console.error('[/api/ocr] Error parsing JSON from Groq response:', parseErr);
+      console.error('[/api/ocr] JSON parse target string was:', jsonText);
+      return res.status(502).json({ error: 'Failed to parse JSON response from vision model.' });
+    }
+
+    console.log('[/api/ocr] Successfully parsed JSON result. Title:', parsed.title);
+    return res.json({
+      text: parsed.text || '',
+      title: parsed.title || 'Analyzed Image',
+      summary: parsed.summary || '',
+      description: parsed.description || 'Extracted from image.',
+      category: parsed.category || 'Design',
+      tags: parsed.tags || [],
+      imageUrl: hostedImageUrl
+    });
+
+  } catch (err: any) {
+    console.error('[/api/ocr] OCR pipeline catch-block error:', err);
+    return res.status(502).json({
+      error: 'Cloud vision model failed processing. Try again later.'
+    });
+  }
+});
+
+// 3. API Endpoints: Stash Database
+const DB_FILE = path.join(process.cwd(), 'stash_db.json');
+
+const DEFAULT_ITEMS = [
+  {
+    id: 'item-1',
+    type: 'image',
+    title: 'Linen Set',
+    description: 'Minimal aesthetic lookbook apparel collection',
+    imageUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&q=80&w=600',
+    category: 'Shopping',
+    extractedText: 'STUDIO PREVIEW - 100% Giza Cotton Linen Shirt White with Relaxed Slate Utility Jeans. Fitted for autumn collections. Brand: SÉZANE.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-2',
+    type: 'image',
+    title: 'Runner V2',
+    description: 'Suede and full-grain leather premium active athletic sneakers',
+    imageUrl: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=600',
+    category: 'Shopping',
+    extractedText: 'STASH LABS INC. RUNNER V2. BEIGE CORAL OUTSOLE AND TEXTURED TPU ENCAPSULATION MIDSOLE. SIZES 8-12.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-3',
+    type: 'image',
+    title: 'Gold Watch',
+    description: 'Gold-plated luxury watch classic vintage collectors edition',
+    imageUrl: 'https://images.unsplash.com/photo-1522312346375-d1a52e2b99b3?auto=format&fit=crop&q=80&w=600',
+    category: 'Shopping',
+    extractedText: 'BOSS HUGO BOSS. CHRONOGRAPH LIMITED SELECTIONS CALIBRE 12. WATER RESISTANT 50M.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-4',
+    type: 'image',
+    title: 'Oak Chair',
+    description: 'Minimal warm scandinavian lounge armchair styling design',
+    imageUrl: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&q=80&w=600',
+    category: 'Design',
+    extractedText: 'OAK SOLID BODY WITH BOUCHÉ WOVEN LINING. RETRO ACCENTS FROM THE 1970S DESIGN INSPIRED BY WEGNER.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-5',
+    type: 'image',
+    title: 'Editorial Looks',
+    description: 'High-contrast studio autumn designer collection',
+    imageUrl: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=80&w=600',
+    category: 'Design',
+    extractedText: 'BALENCIAGA PARIS WINTER SELECTIONS. BURGUNDY VELVET OVERCOAT WITH METALLIC ACCESSORY LOOPS.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'item-6',
+    type: 'link',
+    title: 'Slow Sunday Brunch',
+    description: 'Artisanal eggs benedict paired with wild-fermented yeast sourdough',
+    imageUrl: 'https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&q=80&w=600',
+    sourceUrl: 'https://bonappetit.com/recipe',
+    category: 'Recipes',
+    extractedText: 'Slow Sunday Brunch: 4 organic soft poached eggs, cured duck breasts, chives, dynamic lemon hollandaise sauce.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-7',
+    type: 'link',
+    title: '3D Gradient Studies',
+    description: 'Stellar color mesh and dark translucent glassmorphism explorations',
+    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600',
+    sourceUrl: 'https://dribbble.com/shots',
+    category: 'Design',
+    extractedText: 'CYAN PURPLE FLUID CONTOURS MAPPED IN THREE-DIMENSIONAL SPLINE SPACE WITH FROSTED DISK ACCENTS.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 1.5 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'item-8',
+    type: 'image',
+    title: 'Trip Wishlist',
+    description: 'Misty multi-layered peak textures in Mount Fuji scenic areas',
+    imageUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=600',
+    category: 'Travel',
+    sourceUrl: 'https://airbnb.com/japan-stay',
+    extractedText: 'HAKONE ONSEN RETREATS - FIRST FLOOR SCENERY CARD WITH HEATED SPRING DETAILS AND BALCONY VIEWS.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'item-9',
+    type: 'image',
+    title: 'Grail Drops',
+    description: 'Retro limited run athletic high-tops',
+    imageUrl: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=600',
+    category: 'Shopping',
+    extractedText: 'NIKE AIR FORCE 1 VINTAGE COLLECTORS HIGHER MIDSOLE CONTOURS. BLACK STRAP AT THE UPPER FOOTBED.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 12 * 3600 * 1000).toISOString()
+  },
+  {
+    id: 'item-10',
+    type: 'link',
+    title: 'Cryptographic Sovereignty',
+    description: 'Why localized secure hardware enclaves beats remote multi-tenant clouds.',
+    imageUrl: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=600',
+    sourceUrl: 'https://notion.so/architecture/sovereign-vault',
+    category: 'Articles',
+    extractedText: 'THE CRYPTOGRAPHIC HARDWARE BOUNDS: AES-256 PRIVATE SECURE ENVELOPE SEEDS ARE LOCKED DOWN ON-CHIP FOR HIGH SOVEREIGN METRICS.',
+    status: 'ready',
+    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+  }
+];
+
+let dbItems: any[] = [];
+
+function loadDb() {
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      dbItems = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+      console.log(`[Database] Loaded ${dbItems.length} items from ${DB_FILE}`);
+    } catch (e) {
+      dbItems = [...DEFAULT_ITEMS];
+      saveDb();
+    }
+  } else {
+    dbItems = [...DEFAULT_ITEMS];
+    saveDb();
+  }
+}
+
+function saveDb() {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(dbItems, null, 2), 'utf-8');
+    console.log(`[Database] Saved ${dbItems.length} items to ${DB_FILE}`);
+  } catch (e) {
+    console.error('[Database] Failed to save database:', e);
+  }
+}
+
+loadDb();
+
+// DB API Endpoints
+app.get('/api/items', (req, res) => {
+  res.json(dbItems);
+});
+
+app.post('/api/items', (req, res) => {
+  const newItem = {
+    id: req.body.id || `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    type: req.body.type,
+    title: req.body.title,
+    description: req.body.description || '',
+    imageUrl: req.body.imageUrl || '',
+    sourceUrl: req.body.sourceUrl || '',
+    favicon: req.body.favicon || '',
+    category: req.body.category || 'Design',
+    extractedText: req.body.extractedText || '',
+    summary: req.body.summary || '',
+    status: req.body.status || 'pending',
+    createdAt: req.body.createdAt || new Date().toISOString()
+  };
+  dbItems.unshift(newItem);
+  saveDb();
+  console.log(`[/api/items] Created item: "${newItem.title}" (${newItem.id})`);
+  res.json(newItem);
+});
+
+app.put('/api/items/:id', (req, res) => {
+  const { id } = req.params;
+  const idx = dbItems.findIndex(item => item.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Item not found' });
+  }
+  dbItems[idx] = {
+    ...dbItems[idx],
+    ...req.body
+  };
+  saveDb();
+  console.log(`[/api/items] Updated item: "${dbItems[idx].title}" (${id})`);
+  res.json(dbItems[idx]);
+});
+
+app.delete('/api/items/:id', (req, res) => {
+  const { id } = req.params;
+  const initialLen = dbItems.length;
+  dbItems = dbItems.filter(item => item.id !== id);
+  if (dbItems.length < initialLen) {
+    saveDb();
+    console.log(`[/api/items] Deleted item: ${id}`);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Item not found' });
+  }
+});
+
+app.post('/api/items/reset', (req, res) => {
+  dbItems = [...DEFAULT_ITEMS];
+  saveDb();
+  console.log('[/api/items/reset] Reset database to defaults.');
+  res.json({ success: true, items: dbItems });
 });
 
 // Configure Vite middleware in development, and serve static assets in production

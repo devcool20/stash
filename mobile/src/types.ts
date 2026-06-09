@@ -8,7 +8,8 @@ export interface StashItem {
   favicon?: string;
   category: string;
   extractedText?: string;
-  status: 'processing' | 'ready';
+  summary?: string;
+  status: 'pending' | 'processing' | 'ready';
   createdAt: string;
 }
 

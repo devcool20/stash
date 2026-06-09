@@ -3,21 +3,15 @@ import {
   View,
   StyleSheet,
   StatusBar,
-  AppRegistry,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import Animated, {
-  FadeIn,
-  FadeOut,
-} from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-
-AppRegistry.registerHeadlessTask('ScreenshotIngestionTask', () => require('./src/tasks/screenshotTask').default);
 
 import { db } from './src/database';
 import { StashItem, TabKey, CategoryKey } from './src/types';
 import { AppHeader } from './src/components/AppHeader';
 import { SearchInterceptor } from './src/components/SearchInterceptor';
+
 import { BottomBar } from './src/components/BottomBar';
 import { BackgroundOrbs } from './src/components/BackgroundOrbs';
 import { AddStashModal } from './src/components/AddStashModal';
@@ -30,6 +24,7 @@ import { colors } from './src/theme/colors';
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('stash');
   const [items, setItems] = useState<StashItem[]>([]);
+  const [pendingItems, setPendingItems] = useState<StashItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [focusedItem, setFocusedItem] = useState<StashItem | null>(null);
@@ -37,7 +32,9 @@ export default function App() {
 
   const refreshStorage = useCallback(async () => {
     const all = await db.getAll();
+    const pending = await db.getPending();
     setItems(all);
+    setPendingItems(pending);
   }, []);
 
   useEffect(() => {
@@ -99,6 +96,14 @@ export default function App() {
     refreshStorage();
   };
 
+  const handleProcessBatch = useCallback(async (ids: string[]) => {
+    await db.processBatch(ids);
+    refreshStorage();
+    if (activeTab !== 'stash') setActiveTab('stash');
+  }, [refreshStorage, activeTab]);
+
+  const showSearch = activeTab === 'stash';
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
@@ -108,78 +113,58 @@ export default function App() {
           translucent
         />
         <View style={styles.canvas}>
-          {/* Atmospheric background orbs */}
           <BackgroundOrbs />
 
-          {/* Content with safe area */}
-          <SafeAreaView style={styles.safeArea} edges={['top']}>
-            {/* Main content wrapper - matches web: px-4 pt-3 */}
-            <View style={styles.body}>
-              {/* Header area */}
-              <View style={styles.headerArea}>
-                <AppHeader onIngestPress={() => setIsAddOpen(true)} />
-                {activeTab !== 'profile' && (
-                  <SearchInterceptor
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    matchCount={filteredCount}
-                  />
-                )}
-              </View>
+          <SafeAreaView edges={['top']} style={styles.body}>
+            <View style={styles.headerArea}>
+              <AppHeader onIngestPress={() => setIsAddOpen(true)} />
+              {showSearch && (
+                <SearchInterceptor
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  matchCount={filteredCount}
+                />
+              )}
+            </View>
 
-              {/* Screen content */}
-              <View style={styles.screenContainer}>
-                {activeTab === 'stash' && (
-                  <Animated.View
-                    key="stash"
-                    entering={FadeIn.duration(150)}
-                    exiting={FadeOut.duration(150)}
-                    style={styles.screen}
-                  >
-                    <StashScreen
-                      items={items}
-                      searchQuery={searchQuery}
-                      onItemClick={handleItemClick}
-                      onItemsChanged={refreshStorage}
-                    />
-                  </Animated.View>
-                )}
-                {activeTab === 'categories' && (
-                  <Animated.View
-                    key="categories"
-                    entering={FadeIn.duration(150)}
-                    exiting={FadeOut.duration(150)}
-                    style={styles.screen}
-                  >
-                    <CategoriesScreen
-                      items={items}
-                      searchQuery={searchQuery}
-                      onItemClick={handleItemClick}
-                    />
-                  </Animated.View>
-                )}
-                {activeTab === 'profile' && (
-                  <Animated.View
-                    key="profile"
-                    entering={FadeIn.duration(150)}
-                    exiting={FadeOut.duration(150)}
-                    style={styles.screen}
-                  >
-                    <ProfileScreen onResetDatabase={handleResetDatabase} />
-                  </Animated.View>
-                )}
-              </View>
+            <View style={styles.screenContainer}>
+              {activeTab === 'stash' && (
+                <StashScreen
+                  items={items}
+                  searchQuery={searchQuery}
+                  onItemClick={handleItemClick}
+                  onItemsChanged={refreshStorage}
+                />
+              )}
+              {activeTab === 'categories' && (
+                <CategoriesScreen
+                  pendingItems={pendingItems}
+                  onProcessBatch={handleProcessBatch}
+                />
+              )}
+              {activeTab === 'profile' && (
+                <ProfileScreen
+                  onResetDatabase={handleResetDatabase}
+                />
+              )}
             </View>
           </SafeAreaView>
 
-          {/* Bottom navigation */}
           <BottomBar
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             onAddClick={() => setIsAddOpen(true)}
+            pendingCount={pendingItems.length}
           />
 
-          {/* Modals */}
+          <SafeAreaView
+            edges={['bottom']}
+            style={styles.homeIndicator}
+            pointerEvents="none"
+          >
+            <View style={styles.homeBar} />
+          </SafeAreaView>
+
           <AddStashModal
             visible={isAddOpen}
             onClose={() => setIsAddOpen(false)}
@@ -202,29 +187,37 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg,
   },
   canvas: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: colors.bg,
   },
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  // Matches web simulator viewport: px-4 pt-3
   body: {
     flex: 1,
-    paddingHorizontal: 16, // px-4
-    paddingTop: 12,        // pt-3
+    paddingHorizontal: 14,
+    paddingTop: 4,
   },
   headerArea: {
-    // No extra padding needed — AppHeader already has mb-5 pt-1
+    paddingTop: 4,
   },
   screenContainer: {
     flex: 1,
+    paddingTop: 4,
   },
-  screen: {
-    flex: 1,
+  homeIndicator: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeBar: {
+    width: 112,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
 });

@@ -1,40 +1,55 @@
 export const colors = {
   // Pure black canvas
   bg: '#000000',
-  bgPanel: 'rgba(255,255,255,0.03)',
-  bgPanelStrong: 'rgba(255,255,255,0.06)',
-  bgPanelHover: 'rgba(255,255,255,0.09)',
-  bgDeep: 'rgba(0,0,0,0.4)',
-  bgBlack50: 'rgba(0,0,0,0.5)',
+  bgSoft: '#0A0A0A',
+  bgCard: 'rgba(255, 255, 255, 0.03)',
+  bgCardMuted: 'rgba(255, 255, 255, 0.02)',
+  bgDark: '#000000',
 
-  // Premium text
+  // Text
   textPrimary: '#FFFFFF',
   textSecondary: '#8A8A93',
-  textMuted: '#6E6E76',
-  textFaint: '#4A4A52',
+  textTertiary: '#6E6E76',
+  textOnDark: '#FFFFFF',
+  textOnDarkMuted: 'rgba(255, 255, 255, 0.7)',
+
+  // Glass / Frosted (for glassy buttons)
+  glassBg: 'rgba(255, 255, 255, 0.03)',
+  glassBorder: 'rgba(255, 255, 255, 0.08)',
+  glassShadow: 'rgba(0, 0, 0, 0.5)',
+  glassBgStrong: 'rgba(255, 255, 255, 0.06)',
+  glassBorderStrong: 'rgba(255, 255, 255, 0.12)',
 
   // Borders
-  borderFaint: 'rgba(255,255,255,0.05)',
-  border: 'rgba(255,255,255,0.08)',
-  borderStrong: 'rgba(255,255,255,0.12)',
-  borderDiagonal: 'rgba(255,255,255,0.18)',
+  borderSubtle: 'rgba(255, 255, 255, 0.05)',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderStrong: 'rgba(255, 255, 255, 0.12)',
+  borderActive: '#34D399',
 
-  // Accent
-  emerald: '#34D399',
-  emeraldDeep: '#10B981',
-  amber: '#F59E0B',
-  rose: '#F43F5E',
-  violet: '#8B5CF6',
-  fuchsia: '#D946EF',
-  red: '#EF4444',
+  // Accents
+  accentCoral: '#34D399',
+  accentCoralSoft: 'rgba(52, 211, 153, 0.1)',
+  accentBrown: '#FFFFFF',
+  accentBrownSoft: 'rgba(255, 255, 255, 0.08)',
+  accentGreen: '#34D399',
+  accentGreenSoft: 'rgba(52, 211, 153, 0.1)',
 
-  // Glow tokens
-  glowWhite: 'rgba(255,255,255,0.5)',
-  glowEmerald: 'rgba(52,211,153,0.3)',
+  // Category icon tints
+  catOrange: '#F43F5E',
+  catAmber: '#F59E0B',
+  catEmerald: '#34D399',
+  catViolet: '#8B5CF6',
+  catFuchsia: '#D946EF',
+  catBlue: '#3B82F6',
 
-  // Background atmospheric tones
-  orbIndigo: 'rgba(18,14,46,0.6)',
-  orbEmerald: 'rgba(10,28,22,0.45)',
+  // Shadows
+  shadowSoft: 'rgba(0, 0, 0, 0.5)',
+  shadowMed: 'rgba(0, 0, 0, 0.7)',
+  shadowGlass: 'rgba(0, 0, 0, 0.3)',
+
+  // Overlays
+  overlayDim: 'rgba(0, 0, 0, 0.6)',
+  overlayLight: 'rgba(255, 255, 255, 0.05)',
 } as const;
 
 export const radii = {
@@ -54,3 +69,26 @@ export const spacing = {
   xl: 20,
   xxl: 24,
 } as const;
+
+export const fonts = {
+  // Display (serif) — used for "STASH", titles, brand
+  display: Platform.select({
+    ios: 'Georgia',
+    android: 'serif',
+    default: 'Georgia',
+  }) as string,
+  // Body (sans-serif)
+  body: Platform.select({
+    ios: 'System',
+    android: 'sans-serif',
+    default: 'System',
+  }) as string,
+  // Monospace
+  mono: Platform.select({
+    ios: 'Menlo',
+    android: 'monospace',
+    default: 'Menlo',
+  }) as string,
+};
+
+import { Platform } from 'react-native';

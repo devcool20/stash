@@ -1,23 +1,24 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import { Inbox, FolderHeart, ShieldCheck, Plus } from 'lucide-react-native';
+import { Inbox, FolderOpen, ShieldCheck, Plus } from 'lucide-react-native';
 import { TabKey } from '../types';
-import { colors } from '../theme/colors';
+import { colors, fonts } from '../theme/colors';
 
 interface BottomBarProps {
   activeTab: TabKey;
   setActiveTab: (tab: TabKey) => void;
   onAddClick: () => void;
+  pendingCount?: number;
 }
 
 const TABS: { id: TabKey; label: string; icon: any }[] = [
   { id: 'stash', label: 'Stash', icon: Inbox },
-  { id: 'categories', label: 'Categories', icon: FolderHeart },
+  { id: 'categories', label: 'Inbox', icon: FolderOpen },
   { id: 'profile', label: 'Profile', icon: ShieldCheck },
 ];
 
@@ -25,24 +26,23 @@ export function BottomBar({
   activeTab,
   setActiveTab,
   onAddClick,
+  pendingCount = 0,
 }: BottomBarProps) {
   return (
     <View pointerEvents="box-none" style={styles.container}>
       <View style={styles.barWrap}>
-        {/* Matches web: glass-panel-base glass-border-diagonal px-3 py-2 rounded-full */}
         <View style={styles.bar}>
           <View style={styles.inner}>
             {TABS.map((tab) => (
               <TabButton
                 key={tab.id}
                 isActive={activeTab === tab.id}
-                label={tab.label}
                 Icon={tab.icon}
                 onPress={() => setActiveTab(tab.id)}
+                badge={tab.id === 'categories' ? pendingCount : undefined}
               />
             ))}
 
-            {/* Divider: h-6 w-px bg-white/10 mx-1 */}
             <View style={styles.divider} />
 
             <AddButton onPress={onAddClick} />
@@ -55,14 +55,14 @@ export function BottomBar({
 
 function TabButton({
   isActive,
-  label,
   Icon,
   onPress,
+  badge,
 }: {
   isActive: boolean;
-  label: string;
   Icon: any;
   onPress: () => void;
+  badge?: number;
 }) {
   return (
     <Pressable
@@ -72,26 +72,23 @@ function TabButton({
         pressed && { opacity: 0.8 },
       ]}
     >
-      {isActive && <Animated.View style={styles.activeBg} />}
-      <Icon
-        color={isActive ? '#FFFFFF' : '#9CA3AF'}
-        size={20} // w-5 h-5
-        strokeWidth={isActive ? 2.4 : 2}
+      <View
         style={[
-          styles.tabIcon,
-          isActive && {
-            transform: [{ scale: 1.1 }],
-          },
-        ]}
-      />
-      <Text
-        style={[
-          styles.tabLabel,
-          isActive && { color: '#FFFFFF', fontWeight: '500' },
+          styles.iconWrap,
+          isActive && styles.iconWrapActive,
         ]}
       >
-        {label.toUpperCase()}
-      </Text>
+        <Icon
+          color={isActive ? colors.bg : colors.textPrimary}
+          size={16}
+          strokeWidth={isActive ? 2.4 : 2}
+        />
+        {badge !== undefined && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+          </View>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -101,14 +98,17 @@ function AddButton({ onPress }: { onPress: () => void }) {
   const rotation = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
+    transform: [
+      { scale: scale.value },
+      { rotate: `${rotation.value}deg` },
+    ],
   }));
 
   return (
     <Pressable
       onPressIn={() => {
         scale.value = withSpring(0.9, { stiffness: 300, damping: 15 });
-        rotation.value = withSpring(90, { stiffness: 300, damping: 15 });
+        rotation.value = withSpring(45, { stiffness: 300, damping: 15 });
       }}
       onPressOut={() => {
         scale.value = withSpring(1, { stiffness: 300, damping: 15 });
@@ -118,102 +118,91 @@ function AddButton({ onPress }: { onPress: () => void }) {
       style={styles.addBtn}
     >
       <Animated.View style={animatedStyle}>
-        <Plus color="#000000" size={16} strokeWidth={2.5} />
+        <Plus color={colors.bg} size={18} strokeWidth={2.6} />
       </Animated.View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  // web: fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md z-40
   container: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 24, // bottom-6 = 24px
+    bottom: 18,
     alignItems: 'center',
-    zIndex: 40,
   },
   barWrap: {
-    width: '92%',
-    maxWidth: 448, // max-w-md
+    width: '88%',
+    maxWidth: 320,
   },
-  // web: glass-panel-base px-3 py-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.8)]
   bar: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: colors.glassBgStrong,
     borderRadius: 999,
-    paddingHorizontal: 12, // px-3 = 12px
-    paddingVertical: 8,    // py-2 = 8px
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    // Shadow
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.8,
-    shadowRadius: 50,
-    elevation: 16,
+    borderColor: colors.glassBorder,
   },
-  // web: flex items-center space-x-1 justify-around w-full
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     width: '100%',
   },
-  // web: relative flex-col items-center py-2 px-4 rounded-full
   tabBtn: {
-    position: 'relative',
-    flexDirection: 'column',
+    padding: 2,
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
     alignItems: 'center',
-    paddingVertical: 8,   // py-2 = 8px
-    paddingHorizontal: 16, // px-4 = 16px
-    borderRadius: 999,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  // web: absolute inset-0 bg-white/8 rounded-full border border-white/10 shadow
-  activeBg: {
+  iconWrapActive: {
+    backgroundColor: colors.textPrimary,
+  },
+  badge: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: colors.accentCoral,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  // web: mb-0.5
-  tabIcon: {
-    marginBottom: 2,
+  badgeText: {
+    fontSize: 8,
+    color: colors.bg,
+    fontFamily: fonts.mono,
+    fontWeight: '700',
   },
-  // web: text-[10px] uppercase font-display tracking-widest text-gray-500
-  tabLabel: {
-    fontSize: 10,
-    color: '#6B7280', // text-gray-500
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  // web: h-6 w-px bg-white/10 mx-1
   divider: {
     width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginHorizontal: 4,
+    height: 22,
+    backgroundColor: colors.border,
+    marginHorizontal: 6,
   },
-  // web: p-2.5 rounded-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.2)]
   addBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10, // p-2.5 = 10px
+    padding: 8,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 6,
+    backgroundColor: colors.textPrimary,
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 3,
   },
 });

@@ -1,202 +1,383 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  StyleSheet,
-  Platform,
-  TextInput,
   Pressable,
+  ScrollView,
+  Image,
+  StyleSheet,
 } from 'react-native';
-import { Sparkles, Plus } from 'lucide-react-native';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInUp,
+} from 'react-native-reanimated';
+import {
+  Inbox,
+  Circle,
+  CheckCircle2,
+  Sparkles,
+  Loader,
+} from 'lucide-react-native';
 import { db } from '../database';
-import { StashItem, ActiveCategory, CategoryKey } from '../types';
-import { CategoriesTab } from '../components/CategoriesTab';
-import { MasonryGrid } from '../components/MasonryGrid';
-import { colors } from '../theme/colors';
+import { StashItem } from '../types';
+import { colors, fonts } from '../theme/colors';
 
 interface CategoriesScreenProps {
-  items: StashItem[];
-  searchQuery: string;
-  onItemClick: (item: StashItem) => void;
+  pendingItems: StashItem[];
+  onProcessBatch: (ids: string[]) => Promise<void>;
 }
 
 export function CategoriesScreen({
-  items,
-  searchQuery,
-  onItemClick,
+  pendingItems,
+  onProcessBatch,
 }: CategoriesScreenProps) {
-  const [selectedCategory, setSelectedCategory] =
-    useState<ActiveCategory>('All');
-  const [filtered, setFiltered] = useState<StashItem[]>([]);
-  const [newCategoryName, setNewCategoryName] = useState('');
-
-  const handleAddCategory = async () => {
-    const name = newCategoryName.trim();
-    if (!name) return;
-    await db.addCategory(name);
-    setNewCategoryName('');
-    setSelectedCategory(name);
-  };
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    const run = async () => {
-      let dataset = searchQuery.trim()
-        ? await db.search(searchQuery)
-        : items;
+    setSelectedIds(new Set());
+  }, [pendingItems.length]);
 
-      if (selectedCategory !== 'All') {
-        dataset = dataset.filter(
-          (i) => i.category === (selectedCategory as CategoryKey),
-        );
-      }
-      dataset = dataset.filter(
-        (i) => i.status === 'ready' || i.status === 'processing',
-      );
-      setFiltered(dataset);
-    };
-    run();
-  }, [selectedCategory, searchQuery, items]);
+  const toggleItem = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    if (selectedIds.size === pendingItems.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingItems.map((i) => i.id)));
+    }
+  }, [pendingItems, selectedIds]);
+
+  const handleProcess = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setProcessing(true);
+    await onProcessBatch(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setProcessing(false);
+  }, [selectedIds, onProcessBatch]);
+
+  const allSelected = pendingItems.length > 0 && selectedIds.size === pendingItems.length;
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scroll}
-    >
-      <CategoriesTab
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-      />
-
-      <View style={styles.addCategoryContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Create custom folder..."
-          placeholderTextColor="#6E6E76"
-          value={newCategoryName}
-          onChangeText={setNewCategoryName}
-          autoCapitalize="words"
-        />
-        <Pressable
-          style={({ pressed }) => [
-            styles.addButton,
-            pressed && { opacity: 0.8 },
-          ]}
-          onPress={handleAddCategory}
-        >
-          <Plus color="#000000" size={16} strokeWidth={2.5} />
-        </Pressable>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.headerIconBox}>
+            <Inbox color={colors.bg} size={14} strokeWidth={2.4} />
+          </View>
+          <View>
+            <Text style={styles.headerTitle}>Inbox</Text>
+            <Text style={styles.headerSub}>
+              {pendingItems.length} pending capture{pendingItems.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+        {pendingItems.length > 0 && (
+          <Pressable
+            onPress={toggleAll}
+            style={({ pressed }) => [
+              styles.selectAllBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={styles.selectAllText}>
+              {allSelected ? 'DESELECT' : 'SELECT ALL'}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* web: px-1 flex items-center justify-between text-[9px] font-display text-gray-500 uppercase tracking-widest */}
-      <View style={styles.groupHeader}>
-        <Text style={styles.groupHeaderLabel}>
-          Group cluster: {selectedCategory}
-        </Text>
-        <Text style={styles.groupHeaderCount}>
-          {filtered.length} elements
-        </Text>
-      </View>
-
-      {filtered.length === 0 ? (
-        // web: text-center py-12 bg-white/[0.01] border border-white/5 rounded-2xl p-6 text-gray-500
-        <View style={styles.empty}>
-          <Sparkles
-            color={colors.textMuted}
-            size={20}
-            strokeWidth={1.6}
-            style={{ marginBottom: 4 }}
-          />
-          {/* web: font-display font-medium text-xs text-white */}
-          <Text style={styles.emptyTitle}>Cluster is Empty</Text>
-          {/* web: text-[9px] font-sans mt-0.5 */}
+      {/* Items */}
+      {pendingItems.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconBox}>
+            <Sparkles color={colors.textTertiary} size={20} strokeWidth={1.6} />
+          </View>
+          <Text style={styles.emptyTitle}>Inbox is empty</Text>
           <Text style={styles.emptyDesc}>
-            Scanned resources are auto-indexed via local FTS pipelines.
+            Captured screenshots from the S overlay appear here
           </Text>
         </View>
       ) : (
-        <View style={{ marginTop: 4 }}>
-          <MasonryGrid items={filtered} onItemClick={onItemClick} />
-        </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.list}
+        >
+          {pendingItems.map((item, idx) => (
+            <Animated.View
+              key={item.id}
+              entering={FadeIn.duration(250).delay(idx * 60)}
+            >
+              <Pressable
+                onPress={() => toggleItem(item.id)}
+                style={({ pressed }) => [
+                  styles.itemCard,
+                  selectedIds.has(item.id) && styles.itemCardSelected,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <View style={styles.itemCheckbox}>
+                  {selectedIds.has(item.id) ? (
+                    <CheckCircle2 color={colors.accentCoral} size={18} strokeWidth={2} />
+                  ) : (
+                    <Circle color={colors.textTertiary} size={18} strokeWidth={1.5} />
+                  )}
+                </View>
+
+                {item.imageUrl && (
+                  <Image
+                    source={{ uri: item.imageUrl }}
+                    style={styles.itemThumb}
+                    resizeMode="cover"
+                  />
+                )}
+
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.itemDesc} numberOfLines={2}>
+                    {item.description || 'No description'}
+                  </Text>
+                  <Text style={styles.itemMeta}>
+                    {new Date(item.createdAt).toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+
+                <View style={styles.statusPill}>
+                  <Text style={styles.statusText}>RAW</Text>
+                </View>
+              </Pressable>
+            </Animated.View>
+          ))}
+
+          <View style={{ height: 100 }} />
+        </ScrollView>
       )}
 
-      <View style={{ height: 80 }} />
-    </ScrollView>
+      {/* Process button */}
+      {selectedIds.size > 0 && (
+        <Animated.View
+          entering={SlideInUp.springify().damping(20)}
+          style={styles.processBar}
+        >
+          <Pressable
+            onPress={handleProcess}
+            disabled={processing}
+            style={({ pressed }) => [
+              styles.processBtn,
+              pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            {processing ? (
+              <Loader color={colors.bg} size={14} strokeWidth={2.4} />
+            ) : (
+              <Sparkles color={colors.bg} size={14} strokeWidth={2.4} />
+            )}
+            <Text style={styles.processText}>
+              {processing
+                ? 'Processing...'
+                : `Process ${selectedIds.size} capture${selectedIds.size !== 1 ? 's' : ''}`}
+            </Text>
+          </Pressable>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    paddingTop: 4,
-  },
-  addCategoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    marginBottom: 20,
-    marginTop: 4,
-  },
-  input: {
+  container: {
     flex: 1,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    color: '#FFFFFF',
-    fontSize: 12,
   },
-  addButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#22D3EE',
-    borderRadius: 12,
-    marginLeft: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // web: px-1 flex items-center justify-between text-[9px] font-display text-gray-500 uppercase tracking-widest
-  groupHeader: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 4,
-    marginBottom: 10,
+    paddingHorizontal: 2,
+    marginBottom: 14,
   },
-  groupHeaderLabel: {
-    fontSize: 9,
-    color: '#6B7280', // text-gray-500
-    letterSpacing: 2.5, // tracking-widest
-    textTransform: 'uppercase',
-  },
-  groupHeaderCount: {
-    fontSize: 9,
-    color: '#6B7280',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-  },
-  empty: {
+  headerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 48, // py-12
-    backgroundColor: 'rgba(255,255,255,0.01)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 24,
+    gap: 10,
   },
-  // web: font-display font-medium text-xs text-white
-  emptyTitle: {
+  headerIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: colors.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontFamily: fonts.display,
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '500',
+    letterSpacing: -0.3,
   },
-  // web: text-[9px] font-sans mt-0.5
-  emptyDesc: {
-    color: '#6B7280',
+  headerSub: {
     fontSize: 9,
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
     marginTop: 2,
+  },
+  selectAllBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: colors.glassBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  selectAllText: {
+    fontSize: 8.5,
+    color: colors.textPrimary,
+    fontFamily: fonts.mono,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  list: {
+    gap: 8,
+  },
+  itemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.glassBgStrong,
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    gap: 10,
+    shadowColor: colors.shadowGlass,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  itemCardSelected: {
+    borderColor: colors.accentCoral,
+    backgroundColor: colors.accentCoralSoft,
+  },
+  itemCheckbox: {
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: colors.bgSoft,
+  },
+  itemInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  itemTitle: {
+    fontSize: 11,
+    color: colors.textPrimary,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+  },
+  itemDesc: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
+    lineHeight: 12,
+  },
+  itemMeta: {
+    fontSize: 8,
+    color: colors.textTertiary,
+    fontFamily: fonts.mono,
+    marginTop: 2,
+  },
+  statusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: colors.accentCoralSoft,
+    borderWidth: 1,
+    borderColor: colors.accentCoral,
+  },
+  statusText: {
+    fontSize: 7,
+    color: colors.accentCoral,
+    fontFamily: fonts.mono,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 10,
+  },
+  emptyIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.glassBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    fontFamily: fonts.display,
+    fontWeight: '600',
+  },
+  emptyDesc: {
+    fontSize: 9.5,
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
     textAlign: 'center',
+    paddingHorizontal: 40,
+  },
+  processBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: 22,
+  },
+  processBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: colors.textPrimary,
+    gap: 8,
+    shadowColor: colors.shadowMed,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  processText: {
+    fontSize: 11,
+    color: colors.bg,
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

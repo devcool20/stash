@@ -31,11 +31,27 @@ export default function App() {
   const [isCharging, setIsCharging] = useState(true);
   const [connectionType, setConnectionType] = useState<'WiFi' | '5G' | 'LTE'>('WiFi');
   const [simTime, setSimTime] = useState('17:14');
+  const [isSyncedOnline, setIsSyncedOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsSyncedOnline(true);
+    const handleOffline = () => setIsSyncedOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Initial load & keyboard shortcuts helper
   useEffect(() => {
     setItems(db.getAll());
     
+    const unsubscribe = db.onChange(() => {
+      setItems(db.getAll());
+    });
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -43,7 +59,10 @@ export default function App() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   // Live clock generator for simulated device status bar
@@ -130,8 +149,10 @@ export default function App() {
           <div className="flex items-center space-x-2">
             {/* Sync Status Icon */}
             <div className="flex items-center space-x-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[8px] tracking-widest text-[#8A8A93] font-mono font-bold uppercase hidden mini:inline">LOCAL</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${isSyncedOnline ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+              <span className="text-[8px] tracking-widest text-[#8A8A93] font-mono font-bold uppercase hidden mini:inline">
+                {isSyncedOnline ? 'ONLINE' : 'OFFLINE'}
+              </span>
             </div>
 
             {/* Quick Ingest Button */}
