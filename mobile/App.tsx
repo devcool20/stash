@@ -30,9 +30,6 @@ export default function App() {
     'Lato-Bold': require('./assets/fonts/Lato-Bold.ttf'),
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
 
   const [activeTab, setActiveTab] = useState<TabKey>('stash');
   const [items, setItems] = useState<StashItem[]>([]);
@@ -132,6 +129,10 @@ export default function App() {
   }, [refreshStorage, activeTab]);
 
   const showSearch = activeTab === 'stash';
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <GestureHandlerRootView style={styles.root}>
