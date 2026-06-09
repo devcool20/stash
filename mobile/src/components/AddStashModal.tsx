@@ -54,7 +54,7 @@ export function AddStashModal({
   onClose,
   onSuccess,
 }: AddStashModalProps) {
-  const [mode, setMode] = useState<'url' | 'image'>('url');
+  const [mode, setMode] = useState<'url' | 'image'>('image');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,8 +217,8 @@ export function AddStashModal({
         </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.springify().damping(28).stiffness(180).mass(0.8)}
-          exiting={SlideOutDown.springify().damping(28).stiffness(240)}
+          entering={SlideInDown.springify().damping(35).stiffness(320).mass(0.5)}
+          exiting={SlideOutDown.springify().damping(35).stiffness(350).mass(0.5)}
           style={styles.sheet}
         >
           <View style={styles.sheetPanel}>
@@ -242,37 +242,37 @@ export function AddStashModal({
 
             <View style={styles.modeRow}>
               <Pressable
-                onPress={() => setMode('url')}
-                style={({ pressed }) => [
-                  styles.modeTab,
-                  mode === 'url' && styles.modeTabActive,
-                  pressed && { transform: [{ scale: 0.95 }] },
-                ]}
-              >
-                <Link2
-                  color={mode === 'url' ? colors.bg : colors.textSecondary}
-                  size={12}
-                  strokeWidth={2}
-                />
-                <Text style={[styles.modeText, mode === 'url' && styles.modeTextActive]}>
-                  Link
-                </Text>
-              </Pressable>
-              <Pressable
                 onPress={() => setMode('image')}
                 style={({ pressed }) => [
                   styles.modeTab,
                   mode === 'image' && styles.modeTabActive,
-                  pressed && { transform: [{ scale: 0.95 }] },
+                  pressed && { transform: [{ scale: 0.98 }] },
                 ]}
               >
                 <ImageIcon
-                  color={mode === 'image' ? colors.bg : colors.textSecondary}
-                  size={12}
+                  color={mode === 'image' ? '#000000' : colors.textSecondary}
+                  size={14}
                   strokeWidth={2}
                 />
                 <Text style={[styles.modeText, mode === 'image' && styles.modeTextActive]}>
-                  Image
+                  Screenshot
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setMode('url')}
+                style={({ pressed }) => [
+                  styles.modeTab,
+                  mode === 'url' && styles.modeTabActive,
+                  pressed && { transform: [{ scale: 0.98 }] },
+                ]}
+              >
+                <Link2
+                  color={mode === 'url' ? '#000000' : colors.textSecondary}
+                  size={14}
+                  strokeWidth={2}
+                />
+                <Text style={[styles.modeText, mode === 'url' && styles.modeTextActive]}>
+                  Web Link
                 </Text>
               </Pressable>
             </View>
@@ -309,7 +309,7 @@ export function AddStashModal({
                         pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
                       ]}
                     >
-                      <Search color="#FFFFFF" size={14} strokeWidth={2.4} />
+                      <Search color="#000000" size={16} strokeWidth={2.4} />
                     </Pressable>
                   </View>
                 </View>
@@ -416,81 +416,85 @@ const styles = StyleSheet.create({
   sheetPanel: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(10, 10, 10, 0.65)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: 'rgba(10, 10, 10, 0.95)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: colors.shadowMed,
-    shadowOffset: { width: 0, height: -8 },
+    shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowRadius: 32,
+    elevation: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 22,
-    paddingTop: 18,
-    paddingBottom: 12,
+    paddingTop: 24,
+    paddingBottom: 16,
     backgroundColor: 'transparent',
   },
   title: {
     color: colors.textPrimary,
     fontFamily: fonts.display,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   sub: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: fonts.body,
     marginTop: 4,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 999,
-    backgroundColor: colors.glassBgStrong,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modeRow: {
     flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 22,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    padding: 4,
+    marginHorizontal: 22,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   modeTab: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: colors.glassBg,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
   modeTabActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modeText: {
-    fontSize: 9.5,
+    fontSize: 12,
     color: colors.textSecondary,
     fontFamily: fonts.body,
     fontWeight: '600',
-    letterSpacing: 0.3,
   },
   modeTextActive: {
-    color: '#FFFFFF',
+    color: '#000000',
     fontWeight: '700',
   },
   scroll: {
@@ -529,39 +533,37 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.glassBgStrong,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
     borderWidth: 1,
-    borderColor: colors.glassBorder,
-    borderRadius: 14,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
     paddingLeft: 14,
     paddingRight: 6,
-    shadowColor: colors.shadowGlass,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 1,
+    height: 54,
   },
   textInput: {
     flex: 1,
     color: colors.textPrimary,
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: fonts.body,
     paddingVertical: 12,
   },
   submitBtn: {
-    padding: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 10,
+    height: 42,
+    width: 42,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropzone: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: colors.glassBorder,
-    backgroundColor: colors.glassBgStrong,
-    borderRadius: 16,
-    padding: 22,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    borderRadius: 20,
+    paddingVertical: 40,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

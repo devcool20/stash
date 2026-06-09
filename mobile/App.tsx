@@ -22,6 +22,7 @@ import { StashScreen } from './src/screens/StashScreen';
 import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { colors } from './src/theme/colors';
+import { SplashScreen } from './src/components/SplashScreen';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -31,6 +32,7 @@ export default function App() {
   });
 
 
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('stash');
   const [items, setItems] = useState<StashItem[]>([]);
   const [pendingItems, setPendingItems] = useState<StashItem[]>([]);
@@ -40,6 +42,13 @@ export default function App() {
   const [focusedVisible, setFocusedVisible] = useState(false);
   const [categories, setCategories] = useState<string[]>(['Shopping', 'Recipes', 'Travel', 'Articles', 'Design']);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const refreshStorage = useCallback(async (forceSync = false) => {
     const all = await db.getAll();
@@ -228,6 +237,10 @@ export default function App() {
             onRegroup={handleRegroupItem}
             onUpdate={handleUpdateItem}
           />
+
+          {showSplash && (
+            <SplashScreen />
+          )}
         </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>

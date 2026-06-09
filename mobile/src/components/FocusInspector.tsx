@@ -67,19 +67,7 @@ export function FocusInspector({
   onRegroup,
   onUpdate,
 }: FocusInspectorProps) {
-  const [isZoomed, setIsZoomed] = useState(false);
-  const zoomScale = useSharedValue(1);
-
-  useEffect(() => {
-    zoomScale.value = withSpring(isZoomed ? 1.5 : 1, {
-      damping: 20,
-      stiffness: 150,
-    });
-  }, [isZoomed]);
-
-  const heroAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: zoomScale.value }],
-  }));
+  const [showFullScreen, setShowFullScreen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showRegroupMenu, setShowRegroupMenu] = useState(false);
@@ -142,8 +130,8 @@ export function FocusInspector({
         </Animated.View>
 
         <Animated.View
-          entering={SlideInDown.springify().damping(28).stiffness(180).mass(0.8)}
-          exiting={SlideOutDown.springify().damping(28).stiffness(240)}
+          entering={SlideInDown.springify().damping(35).stiffness(320).mass(0.5)}
+          exiting={SlideOutDown.springify().damping(35).stiffness(350).mass(0.5)}
           style={styles.sheet}
         >
           <View style={styles.sheetPanel}>
@@ -180,41 +168,25 @@ export function FocusInspector({
               showsVerticalScrollIndicator={false}
             >
               {/* Hero image */}
-              <View style={styles.heroWrap}>
-                <Animated.Image
+              <Pressable
+                onPress={() => setShowFullScreen(true)}
+                style={styles.heroWrap}
+              >
+                <Image
                   source={{ uri: resolveImageUri(item.imageUrl) }}
-                  style={[
-                    styles.heroImg,
-                    heroAnimatedStyle,
-                  ]}
-                  resizeMode="cover"
+                  style={styles.heroImg}
+                  resizeMode="contain"
                 />
                 <View style={styles.heroOverlay} />
-                <Pressable
-                  onPress={() => setIsZoomed(!isZoomed)}
-                  style={({ pressed }) => [
-                    styles.zoomBtn,
-                    pressed && { opacity: 0.85 },
-                  ]}
-                >
-                  {isZoomed ? (
-                    <ZoomOut
-                      color={colors.textPrimary}
-                      size={10}
-                      strokeWidth={2.4}
-                    />
-                  ) : (
-                    <ZoomIn
-                      color={colors.textPrimary}
-                      size={10}
-                      strokeWidth={2.4}
-                    />
-                  )}
-                  <Text style={styles.zoomText}>
-                    {isZoomed ? 'ZOOM OUT' : 'PINCH TO ZOOM'}
-                  </Text>
-                </Pressable>
-              </View>
+                <View style={styles.zoomBtn}>
+                  <ZoomIn
+                    color={colors.textPrimary}
+                    size={10}
+                    strokeWidth={2.4}
+                  />
+                  <Text style={styles.zoomText}>TAP TO EXPAND</Text>
+                </View>
+              </Pressable>
 
               {/* Description Section */}
               <View style={{ gap: 6, marginTop: 18 }}>
@@ -546,6 +518,41 @@ export function FocusInspector({
           </View>
         </Animated.View>
       </View>
+
+      {/* Full-Screen Zoomable Image Viewer Modal */}
+      <Modal
+        visible={showFullScreen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFullScreen(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.fullScreenBackdrop}>
+          <ScrollView
+            maximumZoomScale={4}
+            minimumZoomScale={1}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.fullScreenScroll}
+          >
+            <Image
+              source={{ uri: resolveImageUri(item.imageUrl) }}
+              style={styles.fullScreenImage}
+              resizeMode="contain"
+            />
+          </ScrollView>
+
+          <Pressable
+            onPress={() => setShowFullScreen(false)}
+            style={({ pressed }) => [
+              styles.fullScreenCloseBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <X color="#FFFFFF" size={20} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -563,16 +570,16 @@ const styles = StyleSheet.create({
   sheetPanel: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(10, 10, 10, 0.65)',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: 'rgba(10, 10, 10, 0.95)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: colors.shadowMed,
-    shadowOffset: { width: 0, height: -8 },
+    shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowRadius: 32,
+    elevation: 16,
   },
   header: {
     flexDirection: 'row',
@@ -630,17 +637,20 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   heroWrap: {
-    aspectRatio: 16 / 10,
-    backgroundColor: colors.bgCard,
+    width: '100%',
+    height: 340,
+    backgroundColor: 'rgba(255, 255, 255, 0.01)',
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
     shadowColor: colors.shadowMed,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
     shadowRadius: 12,
     elevation: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroImg: {
     width: '100%',
@@ -974,5 +984,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
+  },
+  fullScreenBackdrop: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenScroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
 });
