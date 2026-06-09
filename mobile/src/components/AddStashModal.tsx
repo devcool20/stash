@@ -112,8 +112,8 @@ export function AddStashModal({
         finalCategory = result.category;
       }
 
-      const category = finalCategory && ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'].includes(finalCategory)
-        ? finalCategory
+      const category = finalCategory && finalCategory.trim()
+        ? finalCategory.trim()
         : autoCategorize(finalOcr || finalDesc || '', finalTitle, finalSource);
 
       const readyItem = await db.update(tempItem.id, {

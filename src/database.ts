@@ -151,6 +151,7 @@ export const DEFAULT_ITEMS: StashItem[] = [
 
 class StashDatabase {
   private items: StashItem[] = [];
+  private categories: string[] = [];
   private listeners: (() => void)[] = [];
 
   constructor() {
@@ -176,19 +177,47 @@ class StashDatabase {
         this.items = JSON.parse(stored);
       } else {
         this.items = [...DEFAULT_ITEMS];
-        this.save();
       }
+
+      const storedCats = localStorage.getItem('stash_categories');
+      if (storedCats) {
+        this.categories = JSON.parse(storedCats);
+      } else {
+        this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+      }
+      this.save();
     } catch (e) {
       this.items = [...DEFAULT_ITEMS];
+      this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
     }
   }
 
   private save() {
     try {
       localStorage.setItem('stash_items', JSON.stringify(this.items));
+      localStorage.setItem('stash_categories', JSON.stringify(this.categories));
     } catch (e) {
       console.error('Failed to persist items:', e);
     }
+  }
+
+  public getCategories(): string[] {
+    return [...this.categories];
+  }
+
+  public addCategory(category: string): string[] {
+    const clean = category.trim();
+    if (!clean) return this.categories;
+    const exists = this.categories.some(
+      (c) => c.toLowerCase() === clean.toLowerCase()
+    );
+    if (!exists) {
+      const formatted = clean.charAt(0).toUpperCase() + clean.slice(1);
+      this.categories.push(formatted);
+      this.save();
+      this.notify();
+    }
+    return this.categories;
   }
 
   public async sync() {
@@ -233,11 +262,14 @@ class StashDatabase {
     });
   }
 
-  public getByCategory(category: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design'): StashItem[] {
+  public getByCategory(category: string): StashItem[] {
     return this.getAll().filter(item => item.category === category);
   }
 
   public add(item: Omit<StashItem, 'id' | 'createdAt'> & { id?: string; createdAt?: string }): StashItem {
+    if (item.category) {
+      this.addCategory(item.category);
+    }
     const newItem: StashItem = {
       ...item,
       id: item.id || `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -258,6 +290,9 @@ class StashDatabase {
   }
 
   public update(id: string, updates: Partial<StashItem>): StashItem | null {
+    if (updates.category) {
+      this.addCategory(updates.category);
+    }
     const index = this.items.findIndex(item => item.id === id);
     if (index === -1) return null;
 
@@ -292,17 +327,14 @@ class StashDatabase {
     return this.items.length < initialLen;
   }
 
-  public getCounts(): Record<'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design', number> {
-    const counts = {
-      Shopping: 0,
-      Recipes: 0,
-      Travel: 0,
-      Articles: 0,
-      Design: 0
-    };
+  public getCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    this.categories.forEach(cat => {
+      counts[cat] = 0;
+    });
     this.items.forEach(item => {
-      if (item.status === 'ready' && item.category in counts) {
-        counts[item.category]++;
+      if (item.status === 'ready') {
+        counts[item.category] = (counts[item.category] || 0) + 1;
       }
     });
     return counts;
@@ -324,6 +356,7 @@ class StashDatabase {
 
   public reset() {
     this.items = [...DEFAULT_ITEMS];
+    this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
     this.save();
     this.notify();
 

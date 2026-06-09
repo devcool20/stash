@@ -25,36 +25,54 @@ interface CategoriesTabProps {
 }
 
 interface CategoryDef {
-  id: ActiveCategory;
+  id: string;
   label: string;
   icon: any;
   color: string;
 }
 
-const CATEGORIES: CategoryDef[] = [
-  { id: 'All', label: 'Vault (All)', icon: Layers, color: colors.textPrimary },
-  { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.catOrange },
-  { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.catAmber },
-  { id: 'Travel', label: 'Travel', icon: Compass, color: colors.catEmerald },
-  { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.catViolet },
-  { id: 'Design', label: 'Design', icon: Palette, color: colors.catFuchsia },
-];
+const getCategoryDef = (id: string): CategoryDef => {
+  switch (id) {
+    case 'All':
+      return { id: 'All', label: 'Vault (All)', icon: Layers, color: colors.textPrimary };
+    case 'Shopping':
+      return { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.catOrange };
+    case 'Recipes':
+      return { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.catAmber };
+    case 'Travel':
+      return { id: 'Travel', label: 'Travel', icon: Compass, color: colors.catEmerald };
+    case 'Articles':
+      return { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.catViolet };
+    case 'Design':
+      return { id: 'Design', label: 'Design', icon: Palette, color: colors.catFuchsia };
+    case 'People':
+      return { id: 'People', label: 'People', icon: Layers, color: '#38BDF8' };
+    default:
+      const categoryColors = [
+        '#38BDF8', // sky
+        '#4ADE80', // green
+        '#C084FC', // purple
+        '#F472B6', // pink
+        '#2DD4BF', // teal
+      ];
+      const index = Math.abs(id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % categoryColors.length;
+      return { id, label: id, icon: Layers, color: categoryColors[index] };
+  }
+};
 
 export function CategoriesTab({
   selectedCategory,
   onSelectCategory,
 }: CategoriesTabProps) {
-  const [counts, setCounts] = useState<Record<CategoryKey, number>>({
-    Shopping: 0,
-    Recipes: 0,
-    Travel: 0,
-    Articles: 0,
-    Design: 0,
-  });
+  const [counts, setCounts] = useState<Record<CategoryKey, number>>({});
+  const [categoriesList, setCategoriesList] = useState<string[]>([]);
 
   useEffect(() => {
     db.getCounts().then(setCounts);
+    db.getCategories().then(setCategoriesList);
   }, []);
+
+  const categories = ['All', ...categoriesList].map(getCategoryDef);
 
   return (
     <View style={styles.container}>
@@ -69,7 +87,7 @@ export function CategoriesTab({
         decelerationRate="fast"
         snapToInterval={108}
       >
-        {CATEGORIES.map((cat) => {
+        {categories.map((cat) => {
           const Icon = cat.icon;
           const isSelected = selectedCategory === cat.id;
           const count =

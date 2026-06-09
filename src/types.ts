@@ -6,14 +6,14 @@ export interface StashItem {
   imageUrl?: string;
   sourceUrl?: string;
   favicon?: string;
-  category: 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design';
+  category: string;
   extractedText?: string;
   summary?: string;
   status: 'processing' | 'ready';
   createdAt: string;
 }
 
-export type ActiveCategory = 'All' | 'Shopping' | 'Recipes' | 'Travel' | 'Articles' | 'Design';
+export type ActiveCategory = string;
 
 export interface StorageMetrics {
   usedBytes: number;
