@@ -66,9 +66,9 @@ async function callOcrApi(base64: string): Promise<ProcessedResult | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      console.warn(`[callOcrApi] Request to ${apiUrl}/api/ocr timed out (60s limit reached)`);
+      console.warn(`[callOcrApi] Request to ${apiUrl}/api/ocr timed out (10s limit reached)`);
       controller.abort();
-    }, 60000);
+    }, 10000);
 
     const res = await fetch(`${apiUrl}/api/ocr`, {
       method: 'POST',
