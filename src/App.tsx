@@ -256,17 +256,17 @@ export default function App() {
         <header className="flex items-center justify-between mb-4 pt-1.5 pb-1 shrink-0" id="main-app-header">
           <div className="flex flex-col text-left">
             {/* SVG Animated Wave logo */}
-            <div className="h-8 flex items-center justify-start">
-              <svg width="120" height="32" viewBox="0 0 120 32" className="select-none">
+            <div className="h-9 flex items-center justify-start">
+              <svg width="140" height="36" viewBox="0 0 140 36" className="select-none">
                 <defs>
                   <clipPath id="text-clip">
                     <text
-                      fontSize="24"
+                      fontSize="28"
                       fontWeight="700"
                       fontFamily="Lato, sans-serif"
                       letterSpacing="-0.5px"
                       x="0"
-                      y="24"
+                      y="28"
                     >
                       Stash
                     </text>
@@ -286,12 +286,12 @@ export default function App() {
                 {/* Base background text */}
                 <text
                   fill="rgba(255, 255, 255, 0.15)"
-                  fontSize="24"
+                  fontSize="28"
                   fontWeight="700"
                   fontFamily="Lato, sans-serif"
                   letterSpacing="-0.5px"
                   x="0"
-                  y="24"
+                  y="28"
                 >
                   Stash
                 </text>
