@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Inbox, Circle, CheckCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Inbox, Circle, CheckCircle, Zap, Loader2 } from 'lucide-react';
 import { StashItem } from '../types';
 
 interface CategoriesScreenProps {
@@ -54,9 +54,9 @@ export default function CategoriesScreen({
           <div className="w-7 h-7 rounded-lg bg-white/12 border border-white/25 flex items-center justify-center">
             <Inbox className="text-white" size={14} strokeWidth={2.4} />
           </div>
-          <div>
+          <div className="text-left">
             <h2 className="font-display text-sm font-bold tracking-tight text-white leading-none">Inbox</h2>
-            <span className="text-[9px] text-[#8A8A93] font-sans mt-1 block">
+            <span className="text-[9px] text-[#8A8A93] font-sans mt-1.5 block">
               {pendingItems.length} pending capture{pendingItems.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -75,7 +75,7 @@ export default function CategoriesScreen({
       {pendingItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
           <div className="w-12 h-12 rounded-full bg-white/4 border border-white/8 flex items-center justify-center">
-            <Sparkles className="text-gray-500" size={20} strokeWidth={1.6} />
+            <Zap className="text-gray-500 animate-pulse" size={20} strokeWidth={1.6} />
           </div>
           <h3 className="font-display font-medium text-xs text-white">Inbox is empty</h3>
           <p className="text-[10px] text-gray-500 font-sans px-8 leading-normal">
@@ -96,14 +96,14 @@ export default function CategoriesScreen({
                 <div
                   onClick={() => toggleItem(item.id)}
                   className={`flex items-center gap-3 p-3 bg-white/[0.06] border rounded-2xl cursor-pointer hover:bg-white/[0.08] active:opacity-95 transition-all select-none ${
-                    isSelected ? 'border-emerald-400 bg-emerald-500/10' : 'border-white/6'
+                    isSelected ? 'border-white bg-white/[0.08]' : 'border-white/5'
                   }`}
                 >
                   <div className="flex items-center justify-center shrink-0">
                     {isSelected ? (
-                      <CheckCircle className="text-emerald-400" size={18} strokeWidth={2.4} />
+                      <CheckCircle className="text-white" size={18} strokeWidth={2.4} />
                     ) : (
-                      <Circle className="text-gray-550" size={18} strokeWidth={1.5} />
+                      <Circle className="text-gray-600" size={18} strokeWidth={1.5} />
                     )}
                   </div>
 
@@ -115,7 +115,7 @@ export default function CategoriesScreen({
                     />
                   )}
 
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div className="flex-1 min-w-0 flex flex-col gap-0.5 text-left">
                     <h4 className="text-[11px] font-bold text-white truncate">{item.title}</h4>
                     <p className="text-[9px] text-[#8A8A93] line-clamp-2 leading-normal">
                       {item.description || 'No description'}
@@ -130,8 +130,8 @@ export default function CategoriesScreen({
                     </span>
                   </div>
 
-                  <div className="px-1.5 py-0.5 rounded border border-emerald-400/20 bg-emerald-400/10 shrink-0">
-                    <span className="text-[7px] font-mono font-bold tracking-wider text-emerald-400">RAW</span>
+                  <div className="px-1.5 py-0.5 rounded border border-white/20 bg-white/[0.08] shrink-0">
+                    <span className="text-[7.5px] font-mono font-bold tracking-wider text-white">RAW</span>
                   </div>
                 </div>
               </motion.div>
@@ -158,7 +158,7 @@ export default function CategoriesScreen({
               {processing ? (
                 <Loader2 className="animate-spin text-white" size={14} strokeWidth={2.4} />
               ) : (
-                <Sparkles className="text-white" size={14} strokeWidth={2.4} />
+                <Zap className="text-white animate-bounce" size={14} strokeWidth={2.4} />
               )}
               <span>
                 {processing

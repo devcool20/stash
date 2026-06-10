@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,16 +17,7 @@ import Animated, {
   Easing,
   FadeIn,
 } from 'react-native-reanimated';
-import {
-  ShoppingBag,
-  Utensils,
-  Compass,
-  BookOpen,
-  Layers,
-  Link as LinkIcon,
-  Loader,
-  Palette,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { StashItem, CategoryKey } from '../types';
 import { colors, fonts } from '../theme/colors';
@@ -35,14 +26,18 @@ import { resolveImageUri } from '../processing';
 interface MasonryGridProps {
   items: StashItem[];
   onItemClick: (item: StashItem) => void;
+  isSelectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
-const CATEGORY_ICON: Record<CategoryKey, any> = {
-  Shopping: ShoppingBag,
-  Recipes: Utensils,
-  Travel: Compass,
-  Articles: BookOpen,
-  Design: Palette,
+const CATEGORY_ICON_NAME: Record<string, keyof typeof Feather.glyphMap> = {
+  Shopping: 'shopping-bag',
+  Recipes: 'coffee',
+  Travel: 'compass',
+  Articles: 'book-open',
+  Design: 'aperture',
+  People: 'user',
 };
 
 const CATEGORY_COLOR: Record<CategoryKey, string> = {
@@ -67,11 +62,17 @@ function getRelativeTime(iso: string) {
 }
 
 function getCategoryIcon(category: string) {
-  const Icon = CATEGORY_ICON[category as CategoryKey] || LinkIcon;
-  return <Icon color="#FFFFFF" size={11} strokeWidth={2.4} />;
+  const iconName = CATEGORY_ICON_NAME[category] || 'link';
+  return <Feather name={iconName} color="#FFFFFF" size={11} />;
 }
 
-export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
+export function MasonryGrid({
+  items,
+  onItemClick,
+  isSelectionMode,
+  selectedIds,
+  onToggleSelect,
+}: MasonryGridProps) {
   return (
     <View style={styles.grid}>
       <View style={styles.col}>
@@ -83,6 +84,9 @@ export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
               item={item}
               index={filterIndex}
               onItemClick={onItemClick}
+              isSelectionMode={isSelectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
       </View>
@@ -95,6 +99,9 @@ export function MasonryGrid({ items, onItemClick }: MasonryGridProps) {
               item={item}
               index={filterIndex}
               onItemClick={onItemClick}
+              isSelectionMode={isSelectionMode}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
       </View>
@@ -106,12 +113,25 @@ function GridCard({
   item,
   index,
   onItemClick,
+  isSelectionMode = false,
+  selectedIds,
+  onToggleSelect,
 }: {
   item: StashItem;
   index: number;
   onItemClick: (item: StashItem) => void;
+  isSelectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }) {
   const scale = useSharedValue(1);
+
+  const resolved = resolveImageUri(item.imageUrl);
+  const [imgSource, setImgSource] = useState(resolved);
+
+  useEffect(() => {
+    setImgSource(resolved);
+  }, [resolved]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -121,6 +141,7 @@ function GridCard({
     return <ShimmerCard id={item.id} />;
   }
 
+  const isSelected = isSelectionMode && selectedIds?.has(item.id);
   const catColor =
     CATEGORY_COLOR[item.category] || colors.accentBrown;
 
@@ -130,7 +151,13 @@ function GridCard({
       style={{ marginBottom: 12 }}
     >
       <Pressable
-        onPress={() => onItemClick(item)}
+        onPress={() => {
+          if (isSelectionMode && onToggleSelect) {
+            onToggleSelect(item.id);
+          } else {
+            onItemClick(item);
+          }
+        }}
         onPressIn={() => {
           scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
         }}
@@ -139,14 +166,20 @@ function GridCard({
         }}
       >
         <Animated.View style={animatedStyle}>
-          <View style={styles.card}>
+          <View style={[
+            styles.card,
+            isSelected && styles.cardSelected
+          ]}>
             {item.imageUrl ? (
               <View style={styles.imgWrap}>
                 <ExpoImage
-                  source={{ uri: resolveImageUri(item.imageUrl) }}
+                  source={{ uri: imgSource }}
                   style={styles.img}
                   contentFit="cover"
                   transition={250}
+                  onError={() => {
+                    setImgSource('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600');
+                  }}
                 />
                 <View style={styles.imgOverlay} />
               </View>
@@ -156,7 +189,18 @@ function GridCard({
               {getCategoryIcon(item.category)}
             </View>
 
-            {item.sourceUrl ? (
+            {isSelectionMode ? (
+              <View style={[
+                styles.selectIndicator,
+                isSelected && styles.selectIndicatorActive
+              ]}>
+                <Feather
+                  name={isSelected ? "check-circle" : "circle"}
+                  color={isSelected ? colors.accentCoral : colors.textSecondary}
+                  size={12}
+                />
+              </View>
+            ) : item.sourceUrl ? (
               <View style={styles.faviconPill}>
                 <Image
                   source={{
@@ -210,7 +254,7 @@ function ShimmerCard({ id }: { id: string }) {
     >
       <View style={styles.shimmerTopRow}>
         <View style={[styles.shimmerBlock, { width: 64, height: 24 }]} />
-        <Loader color={colors.textSecondary} size={12} />
+        <Feather name="loader" color={colors.textSecondary} size={12} />
       </View>
       <View style={{ marginTop: 16 }}>
         <View
@@ -302,6 +346,32 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 2,
+  },
+  cardSelected: {
+    borderColor: colors.accentCoral,
+    borderWidth: 1.5,
+  },
+  selectIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 10,
+    shadowColor: colors.shadowMed,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectIndicatorActive: {
+    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+    borderColor: 'rgba(52, 211, 153, 0.3)',
   },
 
   // Shimmer

@@ -13,25 +13,11 @@ import Animated, {
   withSpring,
   FadeIn,
 } from 'react-native-reanimated';
-import {
-  ShieldCheck,
-  Cpu,
-  Heart,
-  RefreshCw,
-  KeyRound,
-  Copy,
-  Check,
-  Eye,
-  EyeOff,
-  Wifi,
-  WifiOff,
-  HardDrive,
-  User,
-  Database,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { db } from '../database';
 import { colors, fonts, radii } from '../theme/colors';
+import { supabase } from '../supabase';
 
 interface SettingsTabProps {
   onResetDatabase: () => void;
@@ -74,10 +60,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         {/* Vault Header */}
         <View style={styles.vaultHeader}>
           <View style={styles.vaultIconBox}>
-            <ShieldCheck
+            <Feather
+              name="shield"
               color="#FFFFFF"
               size={16}
-              strokeWidth={2.4}
             />
           </View>
           <View style={{ flex: 1 }}>
@@ -95,7 +81,7 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         >
           <View style={styles.profileRow}>
             <View style={styles.avatar}>
-              <User color="#FFFFFF" size={16} strokeWidth={2.4} />
+              <Feather name="user" color="#FFFFFF" size={16} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.profileName}>LOCAL OPERATOR</Text>
@@ -118,10 +104,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
           <View style={styles.storageTop}>
             <View style={styles.storageLeft}>
               <View style={styles.iconGlass}>
-                <HardDrive
+                <Feather
+                  name="hard-drive"
                   color={colors.textPrimary}
                   size={12}
-                  strokeWidth={2}
                 />
               </View>
               <View>
@@ -162,16 +148,16 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
           <View style={styles.syncRow}>
             <View style={styles.iconGlass}>
               {localSync ? (
-                <WifiOff
+                <Feather
+                  name="wifi-off"
                   color={colors.accentGreen}
                   size={12}
-                  strokeWidth={2}
                 />
               ) : (
-                <Wifi
+                <Feather
+                  name="wifi"
                   color={colors.textSecondary}
                   size={12}
-                  strokeWidth={2}
                 />
               )}
             </View>
@@ -215,10 +201,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
           <View style={styles.encryptionHeader}>
             <View style={styles.encryptionLeft}>
               <View style={styles.iconGlass}>
-                <Database
+                <Feather
+                  name="database"
                   color={colors.textPrimary}
                   size={12}
-                  strokeWidth={2}
                 />
               </View>
               <Text style={styles.encryptionTitle}>
@@ -231,10 +217,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
           <View style={styles.keySection}>
             <View style={styles.keyTop}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <KeyRound
+                <Feather
+                  name="key"
                   color={colors.textSecondary}
                   size={11}
-                  strokeWidth={2}
                 />
                 <Text style={styles.keyLabel}>
                   Decryption Key Envelope
@@ -245,9 +231,9 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
                   onPress={() => setShowKey(!showKey)}
                 >
                   {showKey ? (
-                    <EyeOff color={colors.textSecondary} size={10} />
+                    <Feather name="eye-off" color={colors.textSecondary} size={10} />
                   ) : (
-                    <Eye color={colors.textSecondary} size={10} />
+                    <Feather name="eye" color={colors.textSecondary} size={10} />
                   )}
                   <Text style={styles.iconBtnLabel}>
                     {showKey ? 'HIDE' : 'SHOW'}
@@ -255,9 +241,9 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
                 </GlassIconBtn>
                 <GlassIconBtn onPress={handleCopyKey}>
                   {copiedKey ? (
-                    <Check color={colors.accentGreen} size={10} />
+                    <Feather name="check" color={colors.accentGreen} size={10} />
                   ) : (
-                    <Copy color={colors.textSecondary} size={10} />
+                    <Feather name="copy" color={colors.textSecondary} size={10} />
                   )}
                 </GlassIconBtn>
               </View>
@@ -296,10 +282,10 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
         >
           <View style={styles.dangerHeader}>
             <View style={styles.dangerIconBox}>
-              <RefreshCw
+              <Feather
+                name="refresh-cw"
                 color={colors.accentCoral}
                 size={11}
-                strokeWidth={2.4}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -333,22 +319,49 @@ export function SettingsTab({ onResetDatabase }: SettingsTabProps) {
               pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
             ]}
           >
-            <RefreshCw
+            <Feather
+              name="refresh-cw"
               color={colors.accentCoral}
               size={11}
-              strokeWidth={2}
             />
             <Text style={styles.resetText}>RESET SANDBOX DATABASE</Text>
           </Pressable>
         </Animated.View>
 
+        {/* Sign Out Button */}
+        <Pressable
+          onPress={async () => {
+            Alert.alert(
+              'Sign Out?',
+              'This will clear your local vault cache and return to the secure sign-in gateway.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Sign Out',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await supabase.auth.signOut();
+                  },
+                },
+              ],
+            );
+          }}
+          style={({ pressed }) => [
+            styles.signOutBtn,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+          ]}
+        >
+          <Feather name="log-out" color="#EF4444" size={13} />
+          <Text style={styles.signOutText}>SIGN OUT OF VAULT</Text>
+        </Pressable>
+
         {/* Credits */}
         <View style={styles.credits}>
           <View style={styles.creditsRow}>
-            <Heart
+            <Feather
+              name="heart"
               color={colors.textTertiary}
               size={8}
-              fill={colors.textTertiary}
             />
             <Text style={styles.creditsText}>LOCAL FIRST</Text>
             <Text style={styles.creditsDot}>·</Text>
@@ -835,5 +848,25 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     letterSpacing: 1.2,
     marginTop: 6,
+  },
+  signOutBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  signOutText: {
+    fontSize: 10,
+    color: '#EF4444',
+    fontFamily: fonts.body,
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
 });

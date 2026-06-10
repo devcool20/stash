@@ -17,29 +17,23 @@ import Animated, {
   SlideInDown,
   SlideOutDown,
 } from 'react-native-reanimated';
-import {
-  Link2,
-  Upload,
-  X,
-  CheckCircle2,
-  Search,
-  Image as ImageIcon,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { db } from '../database';
-import { processImage } from '../processing';
+import { processImage, resolveApiUrl } from '../processing';
 import { StashItem } from '../types';
 import { colors, fonts } from '../theme/colors';
 import { MultiStepLoader } from './MultiStepLoader';
 
 const loadingStates = [
-  { text: 'Capturing screenshot context' },
-  { text: 'Initializing OCR parsing engine' },
-  { text: 'Extracting visual text elements' },
-  { text: 'Analyzing semantic metadata' },
-  { text: 'Synthesizing product identity' },
-  { text: 'Auto-categorizing stash resource' },
-  { text: 'Indexing to local secure vault' }
+  { text: 'Reading your screenshot' },
+  { text: 'Finding links and details' },
+  { text: 'Extracting text and highlights' },
+  { text: 'Analyzing what is inside' },
+  { text: 'Naming and summarizing' },
+  { text: 'Choosing the best category' },
+  { text: 'Saving safely to your stash' }
 ];
 
 
@@ -114,16 +108,33 @@ export function AddStashModal({
         if (!/^https?:\/\//i.test(resolvedUrl)) {
           resolvedUrl = 'https://' + resolvedUrl;
         }
-        let domain = 'stashed-node.net';
+        const apiUrl = await resolveApiUrl();
         try {
-          domain = new URL(resolvedUrl).hostname;
-        } catch {}
-        setPipelineStep(4);
-        finalTitle = domain.replace('www.', '').split('.')[0].toUpperCase() + ' Link Note';
-        finalDesc = `Ingested from ${domain}`;
-        finalImg = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
-        finalSource = resolvedUrl;
-        finalFavicon = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+          const res = await fetch(`${apiUrl}/api/metadata?url=${encodeURIComponent(resolvedUrl)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setPipelineStep(4);
+            finalTitle = data.title || 'Web Note';
+            finalDesc = data.description || '';
+            finalImg = data.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
+            finalSource = data.sourceUrl || resolvedUrl;
+            
+            let domain = 'stashed-node.net';
+            try { domain = new URL(finalSource).hostname; } catch {}
+            finalFavicon = data.favicon || `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+          } else {
+            throw new Error('API fetch failed');
+          }
+        } catch (e) {
+          let domain = 'stashed-node.net';
+          try { domain = new URL(resolvedUrl).hostname; } catch {}
+          setPipelineStep(4);
+          finalTitle = domain.replace('www.', '').split('.')[0].toUpperCase() + ' Link Note';
+          finalDesc = `Ingested from ${domain} (Offline Fallback)`;
+          finalImg = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
+          finalSource = resolvedUrl;
+          finalFavicon = `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+        }
       } else if (source.imageUri) {
         setPipelineStep(3);
         const result = await processImage(source.imageUri, source.title);
@@ -131,7 +142,7 @@ export function AddStashModal({
         finalTitle = result.title;
         finalDesc = result.description || result.summary;
         finalOcr = result.extractedText;
-        finalImg = result.imageUrl || source.imageUri;
+        finalImg = source.imageUri;
         finalCategory = result.category;
       }
 
@@ -174,6 +185,26 @@ export function AddStashModal({
     executePipeline('link', { url: url.trim() });
   };
 
+  const saveImagePermanently = async (tempUri: string): Promise<string> => {
+    try {
+      const persistentDir = `${FileSystem.documentDirectory}stash_images/`;
+      const dirInfo = await FileSystem.getInfoAsync(persistentDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(persistentDir, { intermediates: true });
+      }
+      const fileName = `stash_${Date.now()}_${Math.floor(Math.random() * 10000)}.png`;
+      const persistentUri = persistentDir + fileName;
+      await FileSystem.copyAsync({
+        from: tempUri,
+        to: persistentUri,
+      });
+      return persistentUri;
+    } catch (err) {
+      console.warn('[AddStashModal] Failed to save image permanently, using temp URI:', err);
+      return tempUri;
+    }
+  };
+
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -184,9 +215,13 @@ export function AddStashModal({
       });
       if (!result.canceled && result.assets && result.assets[0]) {
         const a = result.assets[0];
-        setSelectedImage({ uri: a.uri, name: a.fileName || 'capture.png', size: a.fileSize });
+        setLoading(true);
+        const persistentUri = await saveImagePermanently(a.uri);
+        setLoading(false);
+        setSelectedImage({ uri: persistentUri, name: a.fileName || 'capture.png', size: a.fileSize });
       }
     } catch (e: any) {
+      setLoading(false);
       Alert.alert('Image picker failed', e?.message || 'Unknown error');
     }
   };
@@ -236,7 +271,7 @@ export function AddStashModal({
                   pressed && { opacity: 0.7 },
                 ]}
               >
-                <X color={colors.textSecondary} size={16} />
+                <Feather name="x" color={colors.textSecondary} size={16} />
               </Pressable>
             </View>
 
@@ -249,10 +284,10 @@ export function AddStashModal({
                   pressed && { transform: [{ scale: 0.98 }] },
                 ]}
               >
-                <ImageIcon
+                <Feather
+                  name="image"
                   color={mode === 'image' ? '#000000' : colors.textSecondary}
                   size={14}
-                  strokeWidth={2}
                 />
                 <Text style={[styles.modeText, mode === 'image' && styles.modeTextActive]}>
                   Screenshot
@@ -266,10 +301,10 @@ export function AddStashModal({
                   pressed && { transform: [{ scale: 0.98 }] },
                 ]}
               >
-                <Link2
+                <Feather
+                  name="link-2"
                   color={mode === 'url' ? '#000000' : colors.textSecondary}
                   size={14}
-                  strokeWidth={2}
                 />
                 <Text style={[styles.modeText, mode === 'url' && styles.modeTextActive]}>
                   Web Link
@@ -309,7 +344,7 @@ export function AddStashModal({
                         pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
                       ]}
                     >
-                      <Search color="#000000" size={16} strokeWidth={2.4} />
+                      <Feather name="search" color="#000000" size={16} />
                     </Pressable>
                   </View>
                 </View>
@@ -331,7 +366,7 @@ export function AddStashModal({
                           resizeMode="cover"
                         />
                         <View style={styles.previewMeta}>
-                          <CheckCircle2 color={colors.accentCoral} size={12} strokeWidth={2.4} />
+                          <Feather name="check-circle" color={colors.accentCoral} size={12} />
                           <Text style={styles.previewMetaText}>
                             {selectedImage.name || 'Image selected'}
                           </Text>
@@ -340,7 +375,7 @@ export function AddStashModal({
                     ) : (
                       <View style={styles.dropEmpty}>
                         <View style={styles.dropIconBox}>
-                          <Upload color={colors.textSecondary} size={20} strokeWidth={1.8} />
+                          <Feather name="upload" color={colors.textSecondary} size={20} />
                         </View>
                         <Text style={styles.dropTitle}>Choose a screenshot</Text>
                         <Text style={styles.dropSub}>

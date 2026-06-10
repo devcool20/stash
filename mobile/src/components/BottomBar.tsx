@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -7,7 +7,8 @@ import Animated, {
   withTiming,
   interpolateColor,
 } from 'react-native-reanimated';
-import { Inbox, FolderOpen, ShieldCheck, Plus } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { TabKey } from '../types';
 import { colors, fonts } from '../theme/colors';
 
@@ -18,10 +19,10 @@ interface BottomBarProps {
   pendingCount?: number;
 }
 
-const TABS: { id: TabKey; label: string; icon: any }[] = [
-  { id: 'stash', label: 'Stash', icon: Inbox },
-  { id: 'categories', label: 'Inbox', icon: FolderOpen },
-  { id: 'profile', label: 'Profile', icon: ShieldCheck },
+const TABS: { id: TabKey; label: string; icon: string }[] = [
+  { id: 'stash', label: 'Stash', icon: 'archive' },
+  { id: 'categories', label: 'Inbox', icon: 'inbox' },
+  { id: 'profile', label: 'Profile', icon: 'user' },
 ];
 
 export function BottomBar({
@@ -59,6 +60,13 @@ export function BottomBar({
     <View pointerEvents="box-none" style={styles.container}>
       <View style={styles.barWrap}>
         <View style={styles.bar}>
+          {Platform.OS !== 'web' && (
+            <BlurView
+              intensity={45}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          )}
           <View style={styles.inner}>
             {/* Shared sliding active background pill */}
             <Animated.View style={[styles.activeBg, indicatorStyle]} />
@@ -122,10 +130,10 @@ function TabButton({
     >
       <Animated.View style={pressAnimStyle}>
         <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
-          <Icon
+          <Feather
+            name={Icon as any}
             color={isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
             size={16}
-            strokeWidth={isActive ? 2.4 : 2}
           />
           {badge !== undefined && badge > 0 && (
             <View style={styles.badge}>
@@ -163,7 +171,7 @@ function AddButton({ onPress }: { onPress: () => void }) {
       style={styles.addBtn}
     >
       <Animated.View style={animatedStyle}>
-        <Plus color="#FFFFFF" size={18} strokeWidth={2.6} />
+        <Feather name="plus" color="#FFFFFF" size={18} />
       </Animated.View>
     </Pressable>
   );
@@ -184,15 +192,16 @@ const styles = StyleSheet.create({
   bar: {
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: colors.glassBgStrong,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 999,
     shadowColor: colors.shadowMed,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 8,
     borderWidth: 1,
-    borderColor: colors.glassBorder,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    overflow: 'hidden',
   },
   inner: {
     flexDirection: 'row',

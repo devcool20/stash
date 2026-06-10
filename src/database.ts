@@ -1,4 +1,5 @@
 import { StashItem } from './types';
+import { supabase } from './supabase';
 
 // Standard dictionary terms for client-side auto-grouping (zero-server-cost clustering)
 const CATEGORY_DICTIONARY: Record<string, string[]> = {
@@ -156,14 +157,78 @@ function resolveUrl(path: string): string {
   return `http://localhost:3000${path}`;
 }
 
+function dataURLToArrayBuffer(dataURL: string): ArrayBuffer {
+  const base64 = dataURL.split(',')[1];
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+async function uploadLocalImageIfNecessary(item: StashItem, userId: string): Promise<StashItem> {
+  if (item.type === 'image' && item.imageUrl && item.imageUrl.startsWith('data:')) {
+    try {
+      const arrayBuffer = dataURLToArrayBuffer(item.imageUrl);
+      const fileExt = 'png';
+      const filePath = `${userId}/${item.id}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from('screenshots')
+        .upload(filePath, arrayBuffer, {
+          contentType: `image/${fileExt}`,
+          upsert: true,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('screenshots')
+        .getPublicUrl(filePath);
+        
+      if (urlData?.publicUrl) {
+        console.log(`[Database] Successfully uploaded offline cached image to Supabase Storage: ${urlData.publicUrl}`);
+        item.imageUrl = urlData.publicUrl;
+      }
+    } catch (err) {
+      console.warn('[Database] Failed to upload local image to Supabase Storage:', err);
+      // Fallback
+      item.imageUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
+    }
+  }
+  return item;
+}
+
 class StashDatabase {
   private items: StashItem[] = [];
   private categories: string[] = [];
   private listeners: (() => void)[] = [];
+  private currentUserId: string | null = null;
 
   constructor() {
-    this.load();
-    this.sync();
+    this.initialize();
+  }
+
+  private async initialize() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      this.currentUserId = session?.user?.id || null;
+      this.loadItemsForCurrentUser();
+    } catch (e) {
+      this.loadItemsForCurrentUser();
+    }
+  }
+
+  public async setUserId(userId: string | null) {
+    if (this.currentUserId === userId) return;
+    this.currentUserId = userId;
+    this.loadItemsForCurrentUser();
+    this.notify();
+    this.sync().catch(err => console.warn('[Database] Sync error after setUserId:', err));
   }
 
   public onChange(listener: () => void): () => void {
@@ -177,32 +242,51 @@ class StashDatabase {
     this.listeners.forEach(l => l());
   }
 
-  private load() {
+  private getStorageKey(): string {
+    return this.currentUserId ? `stash_items_${this.currentUserId}` : 'stash_items';
+  }
+
+  private getCategoriesKey(): string {
+    return this.currentUserId ? `stash_categories_${this.currentUserId}` : 'stash_categories';
+  }
+
+  private getDeletedKey(): string {
+    return this.currentUserId ? `stash_deleted_ids_${this.currentUserId}` : 'stash_deleted_ids';
+  }
+
+  private loadItemsForCurrentUser() {
     try {
-      const stored = localStorage.getItem('stash_items');
+      const key = this.getStorageKey();
+      const stored = localStorage.getItem(key);
       if (stored) {
         this.items = JSON.parse(stored);
       } else {
-        this.items = [...DEFAULT_ITEMS];
+        if (this.currentUserId) {
+          this.items = [];
+        } else {
+          this.items = [...DEFAULT_ITEMS];
+        }
+        this.save();
       }
 
-      const storedCats = localStorage.getItem('stash_categories');
+      const catsKey = this.getCategoriesKey();
+      const storedCats = localStorage.getItem(catsKey);
       if (storedCats) {
         this.categories = JSON.parse(storedCats);
       } else {
         this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+        localStorage.setItem(catsKey, JSON.stringify(this.categories));
       }
-      this.save();
     } catch (e) {
-      this.items = [...DEFAULT_ITEMS];
+      this.items = this.currentUserId ? [] : [...DEFAULT_ITEMS];
       this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
     }
   }
 
   private save() {
     try {
-      localStorage.setItem('stash_items', JSON.stringify(this.items));
-      localStorage.setItem('stash_categories', JSON.stringify(this.categories));
+      localStorage.setItem(this.getStorageKey(), JSON.stringify(this.items));
+      localStorage.setItem(this.getCategoriesKey(), JSON.stringify(this.categories));
     } catch (e) {
       console.error('Failed to persist items:', e);
     }
@@ -229,6 +313,7 @@ class StashDatabase {
 
   public async sync() {
     try {
+      // 1. Sync with local node server database
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3500); // 3.5s sync timeout
       const res = await fetch(resolveUrl('/api/items'), { signal: controller.signal });
@@ -238,19 +323,19 @@ class StashDatabase {
         const serverItems = await res.json();
         if (Array.isArray(serverItems)) {
           // Track deleted tombstones
-          const deletedIds = JSON.parse(localStorage.getItem('stash_deleted_ids') || '[]');
+          const deletedIds = JSON.parse(localStorage.getItem(this.getDeletedKey()) || '[]');
           const deletedSet = new Set(deletedIds);
 
           const serverIds = new Set(serverItems.map(i => i.id));
           const localIds = new Set(this.items.map(i => i.id));
 
-          // 1. Local-only items to upload to server (restore after server restarts)
+          // Local-only items to upload to server (restore after server restarts)
           const localOnlyItems = this.items.filter(i => !serverIds.has(i.id));
 
-          // 2. Server-only items not in cache and not deleted
+          // Server-only items not in cache and not deleted
           const serverOnlyItems = serverItems.filter(i => !localIds.has(i.id) && !deletedSet.has(i.id));
 
-          // 3. Delete any items on server that have local tombstones
+          // Delete any items on server that have local tombstones
           for (const id of deletedIds) {
             if (serverIds.has(id)) {
               fetch(resolveUrl(`/api/items/${id}`), { method: 'DELETE' })
@@ -258,14 +343,14 @@ class StashDatabase {
             }
           }
 
-          // 4. Merge items
+          // Merge items
           if (serverOnlyItems.length > 0 || localOnlyItems.length > 0) {
             this.items = [...this.items, ...serverOnlyItems];
             this.save();
             this.notify();
           }
 
-          // 5. Upload local-only items back to server
+          // Upload local-only items back to server
           for (const item of localOnlyItems) {
             fetch(resolveUrl('/api/items'), {
               method: 'POST',
@@ -279,6 +364,98 @@ class StashDatabase {
       }
     } catch (e) {
       console.warn('[Database] Web sync failed, running in local-offline cache fallback mode:', e);
+    }
+
+    // 2. Sync with remote Supabase database if authenticated
+    try {
+      const userId = this.currentUserId;
+      if (!userId) {
+        return;
+      }
+
+      const { data: serverItems, error: fetchError } = await supabase
+        .from('items')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (Array.isArray(serverItems)) {
+        const deletedIds = JSON.parse(localStorage.getItem(this.getDeletedKey()) || '[]');
+        const deletedSet = new Set(deletedIds);
+
+        const serverIds = new Set(serverItems.map(i => i.id));
+        const localIds = new Set(this.items.map(i => i.id));
+
+        const localOnlyItems = this.items.filter(i => !serverIds.has(i.id));
+        const serverOnlyItems = serverItems.filter(i => !localIds.has(i.id) && !deletedSet.has(i.id));
+
+        // Delete any items on Supabase that have local tombstones
+        for (const id of deletedIds) {
+          if (serverIds.has(id)) {
+            await supabase.from('items').delete().eq('id', id).eq('user_id', userId);
+          }
+        }
+
+        // Merge server-only items
+        let merged = false;
+        if (serverOnlyItems.length > 0) {
+          const cleanServerItems = serverOnlyItems.map(i => ({
+            id: i.id,
+            type: i.type as 'image' | 'link',
+            title: i.title,
+            description: i.description || '',
+            imageUrl: i.imageUrl || '',
+            sourceUrl: i.sourceUrl || '',
+            favicon: i.favicon || '',
+            category: i.category,
+            extractedText: i.extractedText || '',
+            summary: i.summary || '',
+            status: i.status as 'pending' | 'processing' | 'ready',
+            createdAt: i.createdAt,
+          }));
+          this.items = [...this.items, ...cleanServerItems];
+          merged = true;
+        }
+
+        if (merged) {
+          this.save();
+          this.notify();
+        }
+
+        // Upload local-only items to Supabase
+        for (const item of localOnlyItems) {
+          const updatedItem = await uploadLocalImageIfNecessary(item, userId);
+          if (updatedItem.imageUrl !== item.imageUrl) {
+            const idx = this.items.findIndex(i => i.id === item.id);
+            if (idx !== -1) {
+              this.items[idx].imageUrl = updatedItem.imageUrl;
+              this.save();
+              this.notify();
+            }
+          }
+
+          await supabase.from('items').insert({
+            id: updatedItem.id,
+            user_id: userId,
+            type: updatedItem.type,
+            title: updatedItem.title,
+            description: updatedItem.description || '',
+            imageUrl: updatedItem.imageUrl || '',
+            sourceUrl: updatedItem.sourceUrl || '',
+            favicon: updatedItem.favicon || '',
+            category: updatedItem.category,
+            extractedText: updatedItem.extractedText || '',
+            summary: updatedItem.summary || '',
+            status: updatedItem.status,
+            createdAt: updatedItem.createdAt,
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Database] Supabase sync failed:', e?.message || e);
     }
   }
 
@@ -323,12 +500,47 @@ class StashDatabase {
     this.save();
     this.notify();
 
-    // Sync to backend asynchronously
+    // Sync to backend node server
     fetch(resolveUrl('/api/items'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newItem)
     }).catch(err => console.warn('[Database] Background sync failed for addPending:', err));
+
+    // Sync to Supabase in background
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          const uploaded = await uploadLocalImageIfNecessary(newItem, userId);
+          if (uploaded.imageUrl !== newItem.imageUrl) {
+            const idx = this.items.findIndex(i => i.id === newItem.id);
+            if (idx !== -1) {
+              this.items[idx].imageUrl = uploaded.imageUrl;
+              this.save();
+              this.notify();
+            }
+          }
+          await supabase.from('items').insert({
+            id: uploaded.id,
+            user_id: userId,
+            type: uploaded.type,
+            title: uploaded.title,
+            description: uploaded.description || '',
+            imageUrl: uploaded.imageUrl || '',
+            sourceUrl: uploaded.sourceUrl || '',
+            favicon: uploaded.favicon || '',
+            category: uploaded.category,
+            extractedText: uploaded.extractedText || '',
+            summary: uploaded.summary || '',
+            status: uploaded.status,
+            createdAt: uploaded.createdAt,
+          });
+        } catch (err) {
+          console.warn('[Database] Supabase addPending failed:', err);
+        }
+      })();
+    }
 
     return newItem;
   }
@@ -339,6 +551,8 @@ class StashDatabase {
       .filter((i): i is StashItem => i !== undefined && i.status === 'pending');
 
     const updated: StashItem[] = [];
+    const userId = this.currentUserId;
+
     for (const item of pendingItems) {
       try {
         let finalTitle = item.title;
@@ -395,11 +609,44 @@ class StashDatabase {
           this.addCategory(finalCategory);
           updated.push(this.items[idx]);
 
-          await fetch(resolveUrl(`/api/items/${item.id}`), {
+          const updatedBody = this.items[idx];
+
+          // Sync to node server
+          fetch(resolveUrl(`/api/items/${item.id}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.items[idx])
+            body: JSON.stringify(updatedBody)
           }).catch(err => console.warn('[Database] Background sync failed for processBatch item:', err));
+
+          // Sync to Supabase
+          if (userId) {
+            (async () => {
+              try {
+                let finalItem = { ...updatedBody };
+                const uploaded = await uploadLocalImageIfNecessary(finalItem, userId);
+                if (uploaded.imageUrl !== finalItem.imageUrl) {
+                  const currIdx = this.items.findIndex(i => i.id === finalItem.id);
+                  if (currIdx !== -1) {
+                    this.items[currIdx].imageUrl = uploaded.imageUrl;
+                    this.save();
+                    this.notify();
+                  }
+                  finalItem = uploaded;
+                }
+
+                await supabase.from('items').update({
+                  title: finalItem.title,
+                  description: finalItem.description || '',
+                  extractedText: finalItem.extractedText || '',
+                  category: finalItem.category,
+                  status: 'ready',
+                  imageUrl: finalItem.imageUrl || '',
+                }).eq('id', finalItem.id).eq('user_id', userId);
+              } catch (err) {
+                console.warn('[Database] Supabase processBatch update failed:', err);
+              }
+            })();
+          }
         }
       } catch (err) {
         console.error('Failed to process batch item:', item.id, err);
@@ -445,12 +692,47 @@ class StashDatabase {
     this.save();
     this.notify();
 
-    // Sync to backend asynchronously
+    // Sync to backend node server
     fetch(resolveUrl('/api/items'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newItem)
     }).catch(err => console.warn('[Database] Background sync failed for add:', err));
+
+    // Sync to Supabase in background
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          const uploaded = await uploadLocalImageIfNecessary(newItem, userId);
+          if (uploaded.imageUrl !== newItem.imageUrl) {
+            const idx = this.items.findIndex(i => i.id === newItem.id);
+            if (idx !== -1) {
+              this.items[idx].imageUrl = uploaded.imageUrl;
+              this.save();
+              this.notify();
+            }
+          }
+          await supabase.from('items').insert({
+            id: uploaded.id,
+            user_id: userId,
+            type: uploaded.type,
+            title: uploaded.title,
+            description: uploaded.description || '',
+            imageUrl: uploaded.imageUrl || '',
+            sourceUrl: uploaded.sourceUrl || '',
+            favicon: uploaded.favicon || '',
+            category: uploaded.category,
+            extractedText: uploaded.extractedText || '',
+            summary: uploaded.summary || '',
+            status: uploaded.status,
+            createdAt: uploaded.createdAt,
+          });
+        } catch (err) {
+          console.warn('[Database] Supabase insert failed:', err);
+        }
+      })();
+    }
 
     return newItem;
   }
@@ -469,14 +751,30 @@ class StashDatabase {
     this.save();
     this.notify();
 
-    // Sync to backend asynchronously
+    const updated = this.items[index];
+
+    // Sync to node server
     fetch(resolveUrl(`/api/items/${id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(this.items[index])
+      body: JSON.stringify(updated)
     }).catch(err => console.warn('[Database] Background sync failed for update:', err));
 
-    return this.items[index];
+    // Sync to Supabase
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          await supabase.from('items').update({
+            ...updates
+          }).eq('id', id).eq('user_id', userId);
+        } catch (err) {
+          console.warn('[Database] Supabase update failed:', err);
+        }
+      })();
+    }
+
+    return updated;
   }
 
   public delete(id: string): boolean {
@@ -485,20 +783,80 @@ class StashDatabase {
     
     // Add to deleted set
     try {
-      const deletedIds = JSON.parse(localStorage.getItem('stash_deleted_ids') || '[]');
+      const deletedKey = this.getDeletedKey();
+      const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
       if (!deletedIds.includes(id)) {
         deletedIds.push(id);
-        localStorage.setItem('stash_deleted_ids', JSON.stringify(deletedIds));
+        localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
       }
     } catch (e) {}
 
     this.save();
     this.notify();
 
-    // Sync to backend asynchronously
+    // Sync to node server
     fetch(resolveUrl(`/api/items/${id}`), {
       method: 'DELETE'
     }).catch(err => console.warn('[Database] Background sync failed for delete:', err));
+
+    // Sync to Supabase
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          await supabase.from('items').delete().eq('id', id).eq('user_id', userId);
+        } catch (err) {
+          console.warn('[Database] Supabase delete failed:', err);
+        }
+      })();
+    }
+
+    return this.items.length < initialLen;
+  }
+
+  public deleteBatch(ids: string[]): boolean {
+    if (ids.length === 0) return false;
+    const initialLen = this.items.length;
+    const idSet = new Set(ids);
+    this.items = this.items.filter(item => !idSet.has(item.id));
+
+    // Add to deleted set
+    try {
+      const deletedKey = this.getDeletedKey();
+      const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+      let changed = false;
+      for (const id of ids) {
+        if (!deletedIds.includes(id)) {
+          deletedIds.push(id);
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+      }
+    } catch (e) {}
+
+    this.save();
+    this.notify();
+
+    // Sync to node server (sequentially)
+    for (const id of ids) {
+      fetch(resolveUrl(`/api/items/${id}`), {
+        method: 'DELETE'
+      }).catch(err => console.warn('[Database] Background sync failed for deleteBatch item:', err));
+    }
+
+    // Sync to Supabase
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          await supabase.from('items').delete().in('id', ids).eq('user_id', userId);
+        } catch (err) {
+          console.warn('[Database] Supabase deleteBatch failed:', err);
+        }
+      })();
+    }
 
     return this.items.length < initialLen;
   }
@@ -517,14 +875,13 @@ class StashDatabase {
   }
 
   public getStorageMetrics(): { usedMB: number; maxMB: number; percent: number } {
-    // Each character is 2 bytes in UTF-16
     const str = JSON.stringify(this.items);
     const sizeInBytes = str.length * 2;
     const usedMB = parseFloat((sizeInBytes / (1024 * 1024)).toFixed(2));
     const maxMB = 50.0;
     const percent = Math.min(100, parseFloat(((usedMB / maxMB) * 100).toFixed(1)));
     return {
-      usedMB: usedMB || 28.4, // Prepopulated with Figma typical 28.4MB for mock assets
+      usedMB: usedMB || 28.4,
       maxMB,
       percent: percent || 56.8
     };
@@ -533,13 +890,50 @@ class StashDatabase {
   public reset() {
     this.items = [...DEFAULT_ITEMS];
     this.categories = ['Shopping', 'Recipes', 'Travel', 'Articles', 'Design'];
+    
+    // Clear tombstones
+    try {
+      localStorage.removeItem(this.getDeletedKey());
+    } catch (e) {}
+
     this.save();
     this.notify();
 
-    // Sync to backend asynchronously
+    // Sync to node server
     fetch(resolveUrl('/api/items/reset'), {
       method: 'POST'
     }).catch(err => console.warn('[Database] Background sync failed for reset:', err));
+
+    // Reset on Supabase
+    const userId = this.currentUserId;
+    if (userId) {
+      (async () => {
+        try {
+          // Delete all items for this user
+          await supabase.from('items').delete().eq('user_id', userId);
+          // Insert defaults
+          for (const item of DEFAULT_ITEMS) {
+            await supabase.from('items').insert({
+              id: item.id,
+              user_id: userId,
+              type: item.type,
+              title: item.title,
+              description: item.description || '',
+              imageUrl: item.imageUrl || '',
+              sourceUrl: item.sourceUrl || '',
+              favicon: item.favicon || '',
+              category: item.category,
+              extractedText: item.extractedText || '',
+              summary: item.summary || '',
+              status: item.status,
+              createdAt: item.createdAt,
+            });
+          }
+        } catch (err) {
+          console.warn('[Database] Supabase reset failed:', err);
+        }
+      })();
+    }
   }
 }
 

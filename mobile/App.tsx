@@ -23,6 +23,8 @@ import { CategoriesScreen } from './src/screens/CategoriesScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { colors } from './src/theme/colors';
 import { SplashScreen } from './src/components/SplashScreen';
+import { AuthScreen } from './src/screens/AuthScreen';
+import { supabase } from './src/supabase';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -33,6 +35,8 @@ export default function App() {
 
 
   const [showSplash, setShowSplash] = useState(true);
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('stash');
   const [items, setItems] = useState<StashItem[]>([]);
   const [pendingItems, setPendingItems] = useState<StashItem[]>([]);
@@ -48,6 +52,24 @@ export default function App() {
       setShowSplash(false);
     }, 3000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      db.setUserId(currentSession?.user?.id || null).then(() => {
+        setAuthLoading(false);
+      });
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      db.setUserId(currentSession?.user?.id || null).then(() => {
+        setAuthLoading(false);
+      });
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const refreshStorage = useCallback(async (forceSync = false) => {
@@ -111,9 +133,11 @@ export default function App() {
   };
 
   const handleDeleteItem = async (id: string) => {
-    await db.delete(id);
-    refreshStorage();
     handleCloseInspector();
+    setTimeout(async () => {
+      await db.delete(id);
+      refreshStorage();
+    }, 250);
   };
 
   const handleRegroupItem = async (
@@ -152,6 +176,39 @@ export default function App() {
 
   if (!fontsLoaded) {
     return null;
+  }
+
+  if (showSplash || authLoading) {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor="transparent"
+            translucent
+          />
+          <SplashScreen />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+
+  if (!session) {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor="transparent"
+            translucent
+          />
+          <View style={styles.canvas}>
+            <BackgroundOrbs />
+            <AuthScreen />
+          </View>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
   }
 
   return (
@@ -237,10 +294,6 @@ export default function App() {
             onRegroup={handleRegroupItem}
             onUpdate={handleUpdateItem}
           />
-
-          {showSplash && (
-            <SplashScreen />
-          )}
         </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>

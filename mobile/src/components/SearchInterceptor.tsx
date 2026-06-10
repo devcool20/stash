@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Platform } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { View, TextInput, Text, StyleSheet, Platform, Pressable } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -60,7 +60,7 @@ export function SearchInterceptor({
 
         {/* Search icon with accent glow */}
         <View style={styles.iconContainer}>
-          <Search color={colors.accentCoral} size={14} strokeWidth={2.2} />
+          <Feather name="search" color={colors.accentCoral} size={14} />
         </View>
 
         <TextInput
@@ -75,6 +75,18 @@ export function SearchInterceptor({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
         />
+
+        {value.length > 0 && (
+          <Pressable
+            onPress={() => onChangeText('')}
+            style={({ pressed }) => [
+              styles.clearBtn,
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Feather name="x" color={colors.textSecondary} size={14} />
+          </Pressable>
+        )}
 
         <View style={styles.countPill}>
           <Text style={styles.countText}>
@@ -149,5 +161,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.mono,
     fontWeight: '600',
     letterSpacing: 0.5,
+  },
+  clearBtn: {
+    padding: 6,
+    marginRight: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

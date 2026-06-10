@@ -7,14 +7,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import {
-  Layers,
-  ShoppingBag,
-  Utensils,
-  Compass,
-  BookOpen,
-  Palette,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { ActiveCategory, CategoryKey } from '../types';
 import { db } from '../database';
 import { colors, fonts, radii } from '../theme/colors';
@@ -27,28 +20,28 @@ interface CategoriesTabProps {
 interface CategoryDef {
   id: string;
   label: string;
-  icon: any;
+  icon: string;
   color: string;
 }
 
 const getCategoryDef = (id: string): CategoryDef => {
   switch (id) {
     case 'All':
-      return { id: 'All', label: 'Vault (All)', icon: Layers, color: colors.textPrimary };
+      return { id: 'All', label: 'Vault (All)', icon: 'layers', color: colors.textPrimary };
     case 'Shopping':
-      return { id: 'Shopping', label: 'Shopping', icon: ShoppingBag, color: colors.textPrimary };
+      return { id: 'Shopping', label: 'Shopping', icon: 'shopping-bag', color: colors.textPrimary };
     case 'Recipes':
-      return { id: 'Recipes', label: 'Recipes', icon: Utensils, color: colors.textPrimary };
+      return { id: 'Recipes', label: 'Recipes', icon: 'coffee', color: colors.textPrimary };
     case 'Travel':
-      return { id: 'Travel', label: 'Travel', icon: Compass, color: colors.textPrimary };
+      return { id: 'Travel', label: 'Travel', icon: 'compass', color: colors.textPrimary };
     case 'Articles':
-      return { id: 'Articles', label: 'Articles', icon: BookOpen, color: colors.textPrimary };
+      return { id: 'Articles', label: 'Articles', icon: 'book-open', color: colors.textPrimary };
     case 'Design':
-      return { id: 'Design', label: 'Design', icon: Palette, color: colors.textPrimary };
+      return { id: 'Design', label: 'Design', icon: 'aperture', color: colors.textPrimary };
     case 'People':
-      return { id: 'People', label: 'People', icon: Layers, color: colors.textPrimary };
+      return { id: 'People', label: 'People', icon: 'user', color: colors.textPrimary };
     default:
-      return { id, label: id, icon: Layers, color: colors.textPrimary };
+      return { id, label: id, icon: 'layers', color: colors.textPrimary };
   }
 };
 
@@ -80,7 +73,6 @@ export function CategoriesTab({
         snapToInterval={108}
       >
         {categories.map((cat) => {
-          const Icon = cat.icon;
           const isSelected = selectedCategory === cat.id;
           const count =
             cat.id === 'All'
@@ -109,10 +101,10 @@ export function CategoriesTab({
                       isSelected && styles.iconBoxActive,
                     ]}
                   >
-                    <Icon
+                    <Feather
+                      name={cat.icon as any}
                       color="#FFFFFF"
                       size={16}
-                      strokeWidth={2}
                     />
                   </View>
                   {isSelected && <View style={styles.selDot} />}

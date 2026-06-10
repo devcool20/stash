@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { CheckCircle2 } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { colors, fonts } from '../theme/colors';
 
 export interface LoadingState {
@@ -57,8 +57,8 @@ export function MultiStepLoader({
       <View style={styles.container}>
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.headerSub}>INTELLIGENT SANDBOX CORE</Text>
-            <Text style={styles.headerTitle}>PROCESSING PIPELINE</Text>
+            <Text style={styles.headerSub}>INGESTING NEW RESOURCE</Text>
+            <Text style={styles.headerTitle}>STORING IN YOUR VAULT</Text>
           </View>
 
           <View style={styles.list}>
@@ -74,11 +74,9 @@ export function MultiStepLoader({
                 >
                   <View style={styles.iconWrap}>
                     {isCompleted ? (
-                      <CheckCircle2 color="#FFFFFF" size={20} strokeWidth={2.5} />
+                      <Feather name="check-circle" color="#FFFFFF" size={18} />
                     ) : isActive ? (
-                      <View style={styles.activeCircle}>
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      </View>
+                      <ActivityIndicator color="#FFFFFF" size="small" />
                     ) : (
                       <View style={styles.pendingCircle} />
                     )}

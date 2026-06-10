@@ -12,7 +12,10 @@ import {
   Linking,
   Alert,
   TextInput,
+  Dimensions,
 } from 'react-native';
+
+const { width: WIN_WIDTH, height: WIN_HEIGHT } = Dimensions.get('window');
 import Animated, {
   SlideInDown,
   SlideOutDown,
@@ -22,20 +25,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
-import {
-  X,
-  Copy,
-  Check,
-  ExternalLink,
-  Trash2,
-  FolderSync,
-  Share2,
-  ZoomIn,
-  ZoomOut,
-  ChevronUp,
-  ChevronDown,
-  Pencil,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
 import { StashItem, CategoryKey } from '../types';
@@ -69,6 +59,13 @@ export function FocusInspector({
 }: FocusInspectorProps) {
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(true);
+
+  const resolved = item ? resolveImageUri(item.imageUrl) : '';
+  const [imgSource, setImgSource] = useState(resolved);
+
+  useEffect(() => {
+    setImgSource(resolved);
+  }, [resolved, item?.id]);
   const [copied, setCopied] = useState(false);
   const [showRegroupMenu, setShowRegroupMenu] = useState(false);
 
@@ -113,8 +110,9 @@ export function FocusInspector({
   );
 
   return (
-    <Modal
-      visible={visible}
+    <>
+      <Modal
+        visible={visible}
       transparent
       animationType="none"
       onRequestClose={onClose}
@@ -173,17 +171,16 @@ export function FocusInspector({
                 style={styles.heroWrap}
               >
                 <Image
-                  source={{ uri: resolveImageUri(item.imageUrl) }}
+                  source={{ uri: imgSource }}
                   style={styles.heroImg}
                   resizeMode="contain"
+                  onError={() => {
+                    setImgSource('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600');
+                  }}
                 />
                 <View style={styles.heroOverlay} />
                 <View style={styles.zoomBtn}>
-                  <ZoomIn
-                    color={colors.textPrimary}
-                    size={10}
-                    strokeWidth={2.4}
-                  />
+                  <Feather name="zoom-in" color={colors.textPrimary} size={10} />
                   <Text style={styles.zoomText}>TAP TO EXPAND</Text>
                 </View>
               </Pressable>
@@ -202,7 +199,7 @@ export function FocusInspector({
                         pressed && { opacity: 0.7 },
                       ]}
                     >
-                      <Pencil color={colors.textSecondary} size={11} strokeWidth={2} />
+                      <Feather name="edit-2" color={colors.textSecondary} size={11} />
                     </Pressable>
                   )}
                 </View>
@@ -289,10 +286,10 @@ export function FocusInspector({
                         '',
                       )}
                     </Text>
-                    <ExternalLink
+                    <Feather
+                      name="external-link"
                       color={colors.textSecondary}
                       size={11}
-                      strokeWidth={2}
                     />
                   </Pressable>
                 </View>
@@ -309,16 +306,16 @@ export function FocusInspector({
                       SCANNED TEXT IN IMAGE
                     </Text>
                     {isOcrOpen ? (
-                      <ChevronUp
+                      <Feather
+                        name="chevron-up"
                         color={colors.textSecondary}
                         size={14}
-                        strokeWidth={2}
                       />
                     ) : (
-                      <ChevronDown
+                      <Feather
+                        name="chevron-down"
                         color={colors.textSecondary}
                         size={14}
-                        strokeWidth={2}
                       />
                     )}
                   </Pressable>
@@ -330,7 +327,7 @@ export function FocusInspector({
                         pressed && { opacity: 0.7 },
                       ]}
                     >
-                      <Pencil color={colors.textSecondary} size={11} strokeWidth={2} />
+                      <Feather name="edit-2" color={colors.textSecondary} size={11} />
                     </Pressable>
                   )}
                 </View>
@@ -398,16 +395,16 @@ export function FocusInspector({
                               ]}
                             >
                               {copied ? (
-                                <Check
+                                <Feather
+                                  name="check"
                                   color="#FFFFFF"
                                   size={11}
-                                  strokeWidth={2.4}
                                 />
                               ) : (
-                                <Copy
+                                <Feather
+                                  name="copy"
                                   color="#FFFFFF"
                                   size={11}
-                                  strokeWidth={2.4}
                                 />
                               )}
                               <Text style={styles.copyText}>
@@ -435,7 +432,7 @@ export function FocusInspector({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Trash2 color={colors.accentCoral} size={12} strokeWidth={2} />
+                <Feather name="trash-2" color={colors.accentCoral} size={12} />
                 <Text
                   style={[styles.actionText, { color: colors.accentCoral }]}
                 >
@@ -452,10 +449,10 @@ export function FocusInspector({
                     pressed && { opacity: 0.85 },
                   ]}
                 >
-                  <FolderSync
+                  <Feather
+                    name="folder"
                     color={colors.textPrimary}
                     size={12}
-                    strokeWidth={2}
                   />
                   <Text style={styles.actionText}>MOVE</Text>
                 </Pressable>
@@ -507,10 +504,10 @@ export function FocusInspector({
                   pressed && { opacity: 0.85 },
                 ]}
               >
-                <Share2
+                <Feather
+                  name="share-2"
                   color={colors.textPrimary}
                   size={12}
-                  strokeWidth={2}
                 />
                 <Text style={styles.actionText}>SHARE</Text>
               </Pressable>
@@ -518,9 +515,10 @@ export function FocusInspector({
           </View>
         </Animated.View>
       </View>
+    </Modal>
 
-      {/* Full-Screen Zoomable Image Viewer Modal */}
-      <Modal
+    {/* Full-Screen Zoomable Image Viewer Modal */}
+    <Modal
         visible={showFullScreen}
         transparent
         animationType="fade"
@@ -536,9 +534,12 @@ export function FocusInspector({
             contentContainerStyle={styles.fullScreenScroll}
           >
             <Image
-              source={{ uri: resolveImageUri(item.imageUrl) }}
+              source={{ uri: imgSource }}
               style={styles.fullScreenImage}
               resizeMode="contain"
+              onError={() => {
+                setImgSource('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600');
+              }}
             />
           </ScrollView>
 
@@ -549,11 +550,11 @@ export function FocusInspector({
               pressed && { opacity: 0.7 },
             ]}
           >
-            <X color="#FFFFFF" size={20} strokeWidth={2.5} />
+            <Feather name="x" color="#FFFFFF" size={20} />
           </Pressable>
         </View>
       </Modal>
-    </Modal>
+    </>
   );
 }
 
@@ -995,12 +996,10 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    height: '100%',
   },
   fullScreenImage: {
-    width: '100%',
-    height: '100%',
+    width: WIN_WIDTH,
+    height: WIN_HEIGHT,
   },
   fullScreenCloseBtn: {
     position: 'absolute',

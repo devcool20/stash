@@ -12,13 +12,7 @@ import Animated, {
   FadeOut,
   SlideInUp,
 } from 'react-native-reanimated';
-import {
-  Inbox,
-  Circle,
-  CheckCircle2,
-  Sparkles,
-  Loader,
-} from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { db } from '../database';
 import { StashItem } from '../types';
 import { colors, fonts } from '../theme/colors';
@@ -73,7 +67,7 @@ export function CategoriesScreen({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerIconBox}>
-            <Inbox color="#FFFFFF" size={14} strokeWidth={2.4} />
+            <Feather name="inbox" color="#FFFFFF" size={14} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Inbox</Text>
@@ -101,7 +95,7 @@ export function CategoriesScreen({
       {pendingItems.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconBox}>
-            <Sparkles color={colors.textTertiary} size={20} strokeWidth={1.6} />
+            <Feather name="zap" color={colors.textTertiary} size={20} />
           </View>
           <Text style={styles.emptyTitle}>Inbox is empty</Text>
           <Text style={styles.emptyDesc}>
@@ -114,56 +108,13 @@ export function CategoriesScreen({
           contentContainerStyle={styles.list}
         >
           {pendingItems.map((item, idx) => (
-            <Animated.View
+            <PendingItemCard
               key={item.id}
-              entering={FadeIn.duration(250).delay(idx * 60)}
-            >
-              <Pressable
-                onPress={() => toggleItem(item.id)}
-                style={({ pressed }) => [
-                  styles.itemCard,
-                  selectedIds.has(item.id) && styles.itemCardSelected,
-                  pressed && { opacity: 0.85 },
-                ]}
-              >
-                <View style={styles.itemCheckbox}>
-                  {selectedIds.has(item.id) ? (
-                    <CheckCircle2 color={colors.accentCoral} size={18} strokeWidth={2} />
-                  ) : (
-                    <Circle color={colors.textTertiary} size={18} strokeWidth={1.5} />
-                  )}
-                </View>
-
-                {item.imageUrl && (
-                  <Image
-                    source={{ uri: resolveImageUri(item.imageUrl) }}
-                    style={styles.itemThumb}
-                    resizeMode="cover"
-                  />
-                )}
-
-                <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle} numberOfLines={1}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.itemDesc} numberOfLines={2}>
-                    {item.description || 'No description'}
-                  </Text>
-                  <Text style={styles.itemMeta}>
-                    {new Date(item.createdAt).toLocaleDateString(undefined, {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </View>
-
-                <View style={styles.statusPill}>
-                  <Text style={styles.statusText}>RAW</Text>
-                </View>
-              </Pressable>
-            </Animated.View>
+              item={item}
+              index={idx}
+              isSelected={selectedIds.has(item.id)}
+              onToggle={toggleItem}
+            />
           ))}
 
           <View style={{ height: 100 }} />
@@ -185,9 +136,9 @@ export function CategoriesScreen({
             ]}
           >
             {processing ? (
-              <Loader color="#FFFFFF" size={14} strokeWidth={2.4} />
+              <Feather name="loader" color="#FFFFFF" size={14} />
             ) : (
-              <Sparkles color="#FFFFFF" size={14} strokeWidth={2.4} />
+              <Feather name="zap" color="#FFFFFF" size={14} />
             )}
             <Text style={styles.processText}>
               {processing
@@ -198,6 +149,80 @@ export function CategoriesScreen({
         </Animated.View>
       )}
     </View>
+  );
+}
+
+function PendingItemCard({
+  item,
+  index,
+  isSelected,
+  onToggle,
+}: {
+  item: StashItem;
+  index: number;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+}) {
+  const resolved = resolveImageUri(item.imageUrl);
+  const [imgSource, setImgSource] = useState(resolved);
+
+  useEffect(() => {
+    setImgSource(resolved);
+  }, [resolved]);
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(250).delay(index * 60)}
+    >
+      <Pressable
+        onPress={() => onToggle(item.id)}
+        style={({ pressed }) => [
+          styles.itemCard,
+          isSelected && styles.itemCardSelected,
+          pressed && { opacity: 0.85 },
+        ]}
+      >
+        <View style={styles.itemCheckbox}>
+          {isSelected ? (
+            <Feather name="check-circle" color={colors.accentCoral} size={18} />
+          ) : (
+            <Feather name="circle" color={colors.textTertiary} size={18} />
+          )}
+        </View>
+
+        {item.imageUrl && (
+          <Image
+            source={{ uri: imgSource }}
+            style={styles.itemThumb}
+            resizeMode="cover"
+            onError={() => {
+              setImgSource('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600');
+            }}
+          />
+        )}
+
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.itemDesc} numberOfLines={2}>
+            {item.description || 'No description'}
+          </Text>
+          <Text style={styles.itemMeta}>
+            {new Date(item.createdAt).toLocaleDateString(undefined, {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+        </View>
+
+        <View style={styles.statusPill}>
+          <Text style={styles.statusText}>RAW</Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
