@@ -150,7 +150,16 @@ export const DEFAULT_ITEMS: StashItem[] = [
   }
 ];
 
-function resolveUrl(path: string): string {
+export function resolveUrl(path: string): string {
+  const envUrl = (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) 
+    || (typeof process !== 'undefined' && process.env?.VITE_API_URL);
+  
+  if (envUrl) {
+    const cleanBase = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanBase}${cleanPath}`;
+  }
+  
   if (typeof window !== 'undefined' && window.location) {
     return path;
   }

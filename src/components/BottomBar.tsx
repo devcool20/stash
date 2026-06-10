@@ -19,7 +19,7 @@ export default function BottomBar({ activeTab, setActiveTab, onAddClick, pending
     <div className="fixed bottom-[18px] left-1/2 -translate-x-1/2 w-[88%] max-w-[320px] z-40">
       <div 
         id="bottom-nav"
-        className="glass-panel-base px-2.5 py-[8px] flex items-center justify-between rounded-full bg-white/[0.08] border border-white/[0.06] shadow-[0_6px_16px_rgba(0,0,0,0.5)] h-[52px]"
+        className="navbar-glassmorphism px-2.5 py-[8px] flex items-center justify-between rounded-full shadow-[0_6px_16px_rgba(0,0,0,0.5)] h-[52px]"
       >
         <div className="flex items-center justify-between w-full relative">
           

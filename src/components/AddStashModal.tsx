@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Upload, Link2, CheckCircle, Search, Image as ImageIcon } from 'lucide-react';
-import { db } from '../database';
+import { db, resolveUrl } from '../database';
 import { StashItem } from '../types';
 import { MultiStepLoader } from './ui/multi-step-loader';
 
@@ -113,7 +113,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         }
         
         try {
-          const res = await fetch(`/api/metadata?url=${encodeURIComponent(resolvedUrl)}`);
+          const res = await fetch(resolveUrl(`/api/metadata?url=${encodeURIComponent(resolvedUrl)}`));
           if (!res.ok) throw new Error('Unresponsive domain node.');
           const meta = await res.json();
 
@@ -144,7 +144,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
           mimeType: selectedImageFile?.type || 'image/png'
         };
 
-        const res = await fetch('/api/ocr', {
+        const res = await fetch(resolveUrl('/api/ocr'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(ocrPayload)
