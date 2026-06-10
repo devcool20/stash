@@ -99,3 +99,8 @@
   animation: waveFlow2 2.5s linear infinite;
 }
 
+html, body, input, button, select, textarea {
+  font-family: 'Lato', sans-serif;
+}
+
+

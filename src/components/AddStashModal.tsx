@@ -32,7 +32,7 @@ const PRESETS = [
   },
   {
     name: 'Artisanal Brunch Table',
-    url: 'https://images.unsplash.com/photo-1496041870309-6748e0b0e525?auto=format&fit=crop&q=80&w=600',
+    url: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&q=80&w=600',
     title: 'Slow Breakfast Spread',
     description: 'Poached avocado eggs on sourdough flatlay recipe',
     keyword: 'Recipes'
@@ -157,7 +157,7 @@ export default function AddStashModal({ isOpen, onClose, onSuccess }: AddStashMo
         finalOcr = ocrData.text || '';
         finalTitle = sourceData.title || 'Extracted Screenshot';
         finalDesc = ocrData.description || ocrData.summary || 'Extracted screenshot visual elements';
-        finalImg = ocrData.imageUrl || sourceData.imageBase64 || '';
+        finalImg = sourceData.imageBase64 || '';
         finalCategory = ocrData.category || '';
       }
 

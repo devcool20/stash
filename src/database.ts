@@ -170,8 +170,16 @@ function dataURLToArrayBuffer(dataURL: string): ArrayBuffer {
 
 async function uploadLocalImageIfNecessary(item: StashItem, userId: string): Promise<StashItem> {
   if (item.type === 'image' && item.imageUrl && item.imageUrl.startsWith('data:')) {
+    let arrayBuffer: ArrayBuffer;
     try {
-      const arrayBuffer = dataURLToArrayBuffer(item.imageUrl);
+      arrayBuffer = dataURLToArrayBuffer(item.imageUrl);
+    } catch (err) {
+      console.error('[Database] Corrupted or invalid base64 image URL:', err);
+      item.imageUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
+      return item;
+    }
+
+    try {
       const fileExt = 'png';
       const filePath = `${userId}/${item.id}.${fileExt}`;
       
@@ -195,9 +203,8 @@ async function uploadLocalImageIfNecessary(item: StashItem, userId: string): Pro
         item.imageUrl = urlData.publicUrl;
       }
     } catch (err) {
-      console.warn('[Database] Failed to upload local image to Supabase Storage:', err);
-      // Fallback
-      item.imageUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=600';
+      console.warn('[Database] Failed to upload local image to Supabase Storage (network/API error). Keeping local base64:', err);
+      // Keeping the data: URL intact on network/RLS errors
     }
   }
   return item;
@@ -313,10 +320,11 @@ class StashDatabase {
 
   public async sync() {
     try {
+      const userId = this.currentUserId;
       // 1. Sync with local node server database
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3500); // 3.5s sync timeout
-      const res = await fetch(resolveUrl('/api/items'), { signal: controller.signal });
+      const res = await fetch(resolveUrl(`/api/items?user_id=${userId || ''}`), { signal: controller.signal });
       clearTimeout(timeout);
       
       if (res.ok) {
@@ -338,7 +346,7 @@ class StashDatabase {
           // Delete any items on server that have local tombstones
           for (const id of deletedIds) {
             if (serverIds.has(id)) {
-              fetch(resolveUrl(`/api/items/${id}`), { method: 'DELETE' })
+              fetch(resolveUrl(`/api/items/${id}?user_id=${userId || ''}`), { method: 'DELETE' })
                 .catch(err => console.warn('[Database] Failed to delete item on server:', err));
             }
           }
@@ -352,10 +360,10 @@ class StashDatabase {
 
           // Upload local-only items back to server
           for (const item of localOnlyItems) {
-            fetch(resolveUrl('/api/items'), {
+            fetch(resolveUrl(`/api/items?user_id=${userId || ''}`), {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item)
+              body: JSON.stringify({ ...item, user_id: userId })
             }).catch(err => console.warn('[Database] Failed to restore item to server:', err));
           }
 
@@ -418,6 +426,54 @@ class StashDatabase {
           }));
           this.items = [...this.items, ...cleanServerItems];
           merged = true;
+        }
+
+        // Reconciliation for items present on both local and server
+        const overlappingIds = [...localIds].filter(id => serverIds.has(id));
+        for (const id of overlappingIds) {
+          const localItem = this.items.find(i => i.id === id);
+          const serverItem = serverItems.find(i => i.id === id);
+          if (localItem && serverItem) {
+            const localIsReady = localItem.status === 'ready';
+            const serverIsReady = serverItem.status === 'ready';
+
+            if (localIsReady && !serverIsReady) {
+              // Local is ready, server is not: update server
+              const updatedItem = await uploadLocalImageIfNecessary(localItem, userId);
+              if (updatedItem.imageUrl !== localItem.imageUrl) {
+                localItem.imageUrl = updatedItem.imageUrl;
+              }
+
+              console.log(`[Database] Sync Reconciliation: Updating server item ${id} to 'ready'`);
+              await supabase.from('items').update({
+                title: updatedItem.title,
+                description: updatedItem.description || '',
+                imageUrl: updatedItem.imageUrl || '',
+                sourceUrl: updatedItem.sourceUrl || '',
+                favicon: updatedItem.favicon || '',
+                category: updatedItem.category,
+                extractedText: updatedItem.extractedText || '',
+                summary: updatedItem.summary || '',
+                status: 'ready',
+              }).eq('id', id).eq('user_id', userId);
+              
+              merged = true;
+            } else if (serverIsReady && !localIsReady) {
+              // Server is ready, local is not: update local cache
+              console.log(`[Database] Sync Reconciliation: Updating local item ${id} to 'ready' from server`);
+              localItem.title = serverItem.title;
+              localItem.description = serverItem.description || '';
+              localItem.imageUrl = serverItem.imageUrl || '';
+              localItem.sourceUrl = serverItem.sourceUrl || '';
+              localItem.favicon = serverItem.favicon || '';
+              localItem.category = serverItem.category;
+              localItem.extractedText = serverItem.extractedText || '';
+              localItem.summary = serverItem.summary || '';
+              localItem.status = 'ready';
+              
+              merged = true;
+            }
+          }
         }
 
         if (merged) {
@@ -501,14 +557,14 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend node server
-    fetch(resolveUrl('/api/items'), {
+    const userId = this.currentUserId;
+    fetch(resolveUrl(`/api/items?user_id=${userId || ''}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newItem)
+      body: JSON.stringify({ ...newItem, user_id: userId })
     }).catch(err => console.warn('[Database] Background sync failed for addPending:', err));
 
     // Sync to Supabase in background
-    const userId = this.currentUserId;
     if (userId) {
       (async () => {
         try {
@@ -592,7 +648,9 @@ class StashDatabase {
             finalOcr = ocrData.text || '';
             finalTitle = ocrData.title || finalTitle;
             finalDesc = ocrData.description || ocrData.summary || finalDesc;
-            finalImg = ocrData.imageUrl || finalImg;
+            if ((item.type as string) === 'link') {
+              finalImg = ocrData.imageUrl || finalImg;
+            }
             finalCategory = ocrData.category || finalCategory;
           }
         }
@@ -612,10 +670,10 @@ class StashDatabase {
           const updatedBody = this.items[idx];
 
           // Sync to node server
-          fetch(resolveUrl(`/api/items/${item.id}`), {
+          fetch(resolveUrl(`/api/items/${item.id}?user_id=${userId || ''}`), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatedBody)
+            body: JSON.stringify({ ...updatedBody, user_id: userId })
           }).catch(err => console.warn('[Database] Background sync failed for processBatch item:', err));
 
           // Sync to Supabase
@@ -693,14 +751,14 @@ class StashDatabase {
     this.notify();
 
     // Sync to backend node server
-    fetch(resolveUrl('/api/items'), {
+    const userId = this.currentUserId;
+    fetch(resolveUrl(`/api/items?user_id=${userId || ''}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newItem)
+      body: JSON.stringify({ ...newItem, user_id: userId })
     }).catch(err => console.warn('[Database] Background sync failed for add:', err));
 
     // Sync to Supabase in background
-    const userId = this.currentUserId;
     if (userId) {
       (async () => {
         try {
@@ -754,14 +812,14 @@ class StashDatabase {
     const updated = this.items[index];
 
     // Sync to node server
-    fetch(resolveUrl(`/api/items/${id}`), {
+    const userId = this.currentUserId;
+    fetch(resolveUrl(`/api/items/${id}?user_id=${userId || ''}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updated)
+      body: JSON.stringify({ ...updated, user_id: userId })
     }).catch(err => console.warn('[Database] Background sync failed for update:', err));
 
     // Sync to Supabase
-    const userId = this.currentUserId;
     if (userId) {
       (async () => {
         try {
@@ -795,12 +853,12 @@ class StashDatabase {
     this.notify();
 
     // Sync to node server
-    fetch(resolveUrl(`/api/items/${id}`), {
+    const userId = this.currentUserId;
+    fetch(resolveUrl(`/api/items/${id}?user_id=${userId || ''}`), {
       method: 'DELETE'
     }).catch(err => console.warn('[Database] Background sync failed for delete:', err));
 
     // Sync to Supabase
-    const userId = this.currentUserId;
     if (userId) {
       (async () => {
         try {

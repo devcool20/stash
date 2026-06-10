@@ -798,12 +798,21 @@ loadDb();
 
 // DB API Endpoints
 app.get('/api/items', (req, res) => {
-  res.json(dbItems);
+  const userId = req.query.user_id as string || null;
+  const filtered = dbItems.filter(item => {
+    if (userId) {
+      return item.user_id === userId;
+    }
+    return !item.user_id;
+  });
+  res.json(filtered);
 });
 
 app.post('/api/items', (req, res) => {
+  const userId = req.query.user_id as string || req.body.user_id || null;
   const newItem = {
     id: req.body.id || `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    user_id: userId,
     type: req.body.type,
     title: req.body.title,
     description: req.body.description || '',
@@ -818,19 +827,21 @@ app.post('/api/items', (req, res) => {
   };
   dbItems.unshift(newItem);
   saveDb();
-  console.log(`[/api/items] Created item: "${newItem.title}" (${newItem.id})`);
+  console.log(`[/api/items] Created item: "${newItem.title}" (${newItem.id}) for user: ${userId}`);
   res.json(newItem);
 });
 
 app.put('/api/items/:id', (req, res) => {
   const { id } = req.params;
-  const idx = dbItems.findIndex(item => item.id === id);
+  const userId = req.query.user_id as string || req.body.user_id || null;
+  const idx = dbItems.findIndex(item => item.id === id && (userId ? item.user_id === userId : !item.user_id));
   if (idx === -1) {
-    return res.status(404).json({ error: 'Item not found' });
+    return res.status(404).json({ error: 'Item not found or unauthorized' });
   }
   dbItems[idx] = {
     ...dbItems[idx],
-    ...req.body
+    ...req.body,
+    user_id: userId
   };
   saveDb();
   console.log(`[/api/items] Updated item: "${dbItems[idx].title}" (${id})`);
@@ -839,22 +850,29 @@ app.put('/api/items/:id', (req, res) => {
 
 app.delete('/api/items/:id', (req, res) => {
   const { id } = req.params;
+  const userId = req.query.user_id as string || null;
   const initialLen = dbItems.length;
-  dbItems = dbItems.filter(item => item.id !== id);
+  dbItems = dbItems.filter(item => !(item.id === id && (userId ? item.user_id === userId : !item.user_id)));
   if (dbItems.length < initialLen) {
     saveDb();
     console.log(`[/api/items] Deleted item: ${id}`);
     res.json({ success: true });
   } else {
-    res.status(404).json({ error: 'Item not found' });
+    res.status(404).json({ error: 'Item not found or unauthorized' });
   }
 });
 
 app.post('/api/items/reset', (req, res) => {
-  dbItems = [...DEFAULT_ITEMS];
+  const userId = req.query.user_id as string || null;
+  if (userId) {
+    dbItems = dbItems.filter(item => item.user_id !== userId);
+  } else {
+    dbItems = dbItems.filter(item => !!item.user_id);
+    dbItems = [...dbItems, ...DEFAULT_ITEMS];
+  }
   saveDb();
-  console.log('[/api/items/reset] Reset database to defaults.');
-  res.json({ success: true, items: dbItems });
+  console.log(`[/api/items/reset] Reset database for user: ${userId}.`);
+  res.json({ success: true });
 });
 
 // Configure Vite middleware in development, and serve static assets in production
